@@ -107,11 +107,12 @@ operator<< (std::ostream & os, TypeHeader const & h)
 // HELLO
 //-----------------------------------------------------------------------------
 //shinato
-HelloHeader::HelloHeader (uint64_t originPosx, uint64_t originPosy, /*std::string msg,*/ uint64_t test)
+HelloHeader::HelloHeader (uint64_t originPosx, uint64_t originPosy, uint64_t test, uint64_t signature, uint64_t signatureLength)
   : m_originPosx (originPosx),
     m_originPosy (originPosy),
-    //message (msg),
-    testcode (test)
+    testcode (test),
+    sign (signature),
+    signlength (signatureLength)
 {
 }
 
@@ -138,8 +139,7 @@ HelloHeader::GetSerializedSize () const
 {
   //shinato
   //helloパケット数×８
-  return 24;
-  //return 16;
+  return 40;
 }
 
 void
@@ -152,7 +152,8 @@ HelloHeader::Serialize (Buffer::Iterator i) const
   i.WriteHtonU64 (m_originPosy);
   //shinato
   i.WriteHtolsbU64 (testcode);
-
+  i.WriteHtolsbU64 (sign);
+  i.WriteHtolsbU64 (signlength);
 }
 
 uint32_t
@@ -165,6 +166,8 @@ HelloHeader::Deserialize (Buffer::Iterator start)
   m_originPosy = i.ReadNtohU64 ();
   //shinato
   testcode = i.ReadLsbtohU64 ();
+  sign = i.ReadLsbtohU64 ();
+  signlength = i.ReadLsbtohU64 ();
 
   NS_LOG_DEBUG ("Deserialize X " << m_originPosx << " Y " << m_originPosy);
 

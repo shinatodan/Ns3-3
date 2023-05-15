@@ -28,6 +28,10 @@
 #include <map>
 #include <complex>
 
+#include <openssl/dsa.h>
+#include <openssl/err.h>
+#include <openssl/sha.h>
+
 namespace ns3 {
 namespace gpsr {
 /**
@@ -37,6 +41,8 @@ namespace gpsr {
  */
 class RoutingProtocol : public Ipv4RoutingProtocol
 {
+  //shinato
+  DSA* dsa;
 public:
   static TypeId GetTypeId (void);
   static const uint32_t GPSR_PORT;
@@ -66,6 +72,9 @@ public:
   virtual void UpdateRouteToNeighbor (Ipv4Address sender, Ipv4Address receiver, Vector Pos, uint64_t nodeid);
   virtual void SendHello ();
   virtual bool IsMyOwnAddress (Ipv4Address src);
+  //shinato
+  virtual void handleErrors();
+   
 
   Ptr<Ipv4> m_ipv4;
   /// 各インターフェースごとrawソケット, マップソケット -> iface address (IP + mask)
@@ -121,7 +130,7 @@ private:
   
   //shinato
   uint64_t nodeId = 0;  //ノードID取得用変数
-  //std::string Addpass(std::string &s, uint32_t Id);
+  
   
   uint32_t MaxQueueLen;                  ///<ルーティング プロトコルがバッファできるパケットの最大数
   Time MaxQueueTime;                     ///<ルーティング プロトコルがパケットをバッファできる最大時間
