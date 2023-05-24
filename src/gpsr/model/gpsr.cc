@@ -741,10 +741,8 @@ RoutingProtocol::RecvGPSR (Ptr<Socket> socket)
         uint64_t signlength = hdr.Getmessagelength(); 
         //検証できる型に変換
         unsigned char signature_bytes[sizeof(uint64_t)];
-        for (int i = sizeof(uint64_t) - 1; i >= 0; i--) {
-                signature_bytes[i] = static_cast<unsigned char>(sign & 0xFF);
-                sign >>= 8;
-        }
+        ConvertSignatureToBytes(sign, signature_bytes, sizeof(uint64_t));
+
         unsigned int signature_Length;
         signature_Length = static_cast<unsigned int>(signlength);
 
@@ -938,6 +936,27 @@ RoutingProtocol::HelloTimerExpire ()
         //HelloInterval + JITTERの遅延時間を持つ新しいタイマーを作成
         HelloIntervalTimer.Schedule (HelloInterval + JITTER);
 }
+//DSA署名をuint64_t型に変換
+uint64_t
+RoutingProtocol::ConvertSignatureToUint64(const unsigned char* signature, unsigned int length){
+        uint64_t result = 0;
+    for (unsigned int i = 0; i < sizeof(uint64_t) && i < length; i++)
+    {
+        result <<= 8;
+        result |= static_cast<uint64_t>(signature[i]);
+    }
+    return result;
+}
+// uint64_t型の署名をunsigned char[]型に変換する関数
+void 
+RoutingProtocol::ConvertSignatureToBytes(uint64_t signature_uint64, unsigned char* signature_bytes, unsigned int length)
+{
+    for (unsigned int i = 0; i < sizeof(uint64_t) && i < length; i++)
+    {
+        signature_bytes[length - 1 - i] = static_cast<unsigned char>((signature_uint64 >> (i * 8)) & 0xFF);
+    }
+}
+
 
 //Hello Packetsの送信
 void
@@ -968,16 +987,11 @@ RoutingProtocol::SendHello ()
                 handleErrors();
         }
         //署名をhelloに載せられる形に変換
-        uint64_t signature_uint64 = 0;
-        for (unsigned int i = 0; i < sizeof(uint64_t); i++) {
-                signature_uint64 <<= 8;
-                signature_uint64 |= static_cast<uint64_t>(signature[i]);
-        }
+        uint64_t signature_uint64 = ConvertSignatureToUint64(signature, signatureLength);
+        
         //署名の長さをhelloに載せられる形に変換
         uint64_t signatureLengthUint64;
         signatureLengthUint64 = static_cast<uint64_t>(signatureLength);
-
-
 
 	for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j != m_socketAddresses.end (); ++j)
 	{
@@ -987,6 +1001,7 @@ RoutingProtocol::SendHello ()
                 //shinato
                 //helloヘッダーにDSA署名を追加
 		HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY), nodeId, signature_uint64, signatureLengthUint64);
+                
 
 		Ptr<Packet> packet = Create<Packet> ();
 		packet->AddHeader (helloHeader);

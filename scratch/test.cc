@@ -28,31 +28,19 @@ int main() {
     return 0;
 }*/
 #include "ns3/core-module.h"
-#include <openssl/sha.h>
+#include <iostream>
 
-using namespace ns3;
+int main() {
+    int value = 0x01020304;
+    unsigned char* bytes = reinterpret_cast<unsigned char*>(&value);
 
-int main()
-{
-  // メッセージの定義
-  std::string message = "Hello, ns-3 with OpenSSL!";
+    if (bytes[0] == bytes[sizeof(int) - 1]) {
+        std::cout << "Little Endian" << std::endl;
+    } else {
+        std::cout << "Big Endian" << std::endl;
+    }
 
-  // SHA256ハッシュの計算
-  unsigned char hash[SHA256_DIGEST_LENGTH];
-  SHA256_CTX sha256;
-  SHA256_Init(&sha256);
-  SHA256_Update(&sha256, message.c_str(), message.length());
-  SHA256_Final(hash, &sha256);
-
-  // ハッシュ値の表示
-  std::cout << "Message: " << message << std::endl;
-  std::cout << "SHA256 Hash: ";
-  for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
-    printf("%02x", hash[i]);
-  }
-  std::cout << std::endl;
-
-  return 0;
+    return 0;
 }
 
 

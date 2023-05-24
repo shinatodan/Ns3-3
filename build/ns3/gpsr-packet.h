@@ -66,6 +66,12 @@ public:
   /// c-tor
   //shinato
   HelloHeader (uint64_t originPosx = 0, uint64_t originPosy = 0, uint64_t test = 0, uint64_t signature = 0, uint64_t signatureLength=0);
+  // 署名データをセットするメソッド
+  void SetSignature(const std::vector<unsigned char>& signature)
+  {
+    m_signature = signature;
+    m_signatureLength = signature.size();
+  }
 
   ///\name Header serialization/deserialization
   //\{
@@ -132,6 +138,8 @@ private:
   uint64_t testcode;
   uint64_t sign;
   uint64_t signlength;
+  std::vector<unsigned char> m_signature;  // 署名データを保持する変数
+  unsigned int m_signatureLength;          // 署名の長さを保持する変数
 };
 
 std::ostream & operator<< (std::ostream & os, HelloHeader const &);

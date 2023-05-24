@@ -74,6 +74,8 @@ public:
   virtual bool IsMyOwnAddress (Ipv4Address src);
   //shinato
   virtual void handleErrors();
+  uint64_t ConvertSignatureToUint64(const unsigned char* signature, unsigned int length);
+  void ConvertSignatureToBytes(uint64_t signature_uint64, unsigned char* signature_bytes, unsigned int length);
    
 
   Ptr<Ipv4> m_ipv4;
