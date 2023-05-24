@@ -5,6 +5,10 @@
 #include "ns3/packet.h"
 #include "ns3/log.h"
 
+#include <openssl/dsa.h>
+#include <openssl/err.h>
+#include <openssl/sha.h>
+
 NS_LOG_COMPONENT_DEFINE ("GpsrPacket");
 
 namespace ns3 {
@@ -107,13 +111,15 @@ operator<< (std::ostream & os, TypeHeader const & h)
 // HELLO
 //-----------------------------------------------------------------------------
 //shinato
-HelloHeader::HelloHeader (uint64_t originPosx, uint64_t originPosy, uint64_t test, uint64_t signature, uint64_t signatureLength)
+HelloHeader::HelloHeader (uint64_t originPosx, uint64_t originPosy, uint64_t node, const unsigned char* signature, unsigned int signatureLength)
   : m_originPosx (originPosx),
     m_originPosy (originPosy),
-    testcode (test),
-    sign (signature),
-    signlength (signatureLength)
+    nodeid (node),
+    m_signatureLength(signatureLength)
 {
+  if (signature != nullptr) {
+    memcpy(m_signature, signature, SHA256_DIGEST_LENGTH);
+  }
 }
 
 NS_OBJECT_ENSURE_REGISTERED (HelloHeader);
@@ -139,7 +145,8 @@ HelloHeader::GetSerializedSize () const
 {
   //shinato
   //helloパケット数×８
-  return 40;
+  //return 32;
+  return sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + m_signatureLength;
 }
 
 void
@@ -147,33 +154,33 @@ HelloHeader::Serialize (Buffer::Iterator i) const
 {
   NS_LOG_DEBUG ("Serialize X " << m_originPosx << " Y " << m_originPosy);
 
+  // シリアル化されるデータのサイズを取得
+  //uint32_t size = GetSerializedSize();
 
-  i.WriteHtonU64 (m_originPosx);
-  i.WriteHtonU64 (m_originPosy);
-  //shinato
-  i.WriteHtolsbU64 (testcode);
-  i.WriteHtolsbU64 (sign);
-  i.WriteHtolsbU64 (signlength);
+  // データのシリアル化
+  i.WriteHtonU64(m_originPosx);
+  i.WriteHtonU64(m_originPosy);
+  i.WriteHtonU64(nodeid);
+  i.Write(m_signature, GetSignatureLength());
+
 }
 
 uint32_t
 HelloHeader::Deserialize (Buffer::Iterator start)
 {
 
-  Buffer::Iterator i = start;
+   // シリアル化されるデータのサイズを取得
+  uint32_t size = GetSerializedSize();
 
-  m_originPosx = i.ReadNtohU64 ();
-  m_originPosy = i.ReadNtohU64 ();
-  //shinato
-  testcode = i.ReadLsbtohU64 ();
-  sign = i.ReadLsbtohU64 ();
-  signlength = i.ReadLsbtohU64 ();
 
-  NS_LOG_DEBUG ("Deserialize X " << m_originPosx << " Y " << m_originPosy);
+  // データのデシリアル化
+  m_originPosx = start.ReadNtohU64();
+  m_originPosy = start.ReadNtohU64();
+  nodeid = start.ReadNtohU64();
+  start.Read(m_signature, GetSignatureLength());
 
-  uint32_t dist = i.GetDistanceFrom (start);
-  NS_ASSERT (dist == GetSerializedSize ());
-  return dist;
+  // デシリアル化したデータのバイト数を返す
+  return size;
 }
 
 void

@@ -10,7 +10,7 @@ void handleErrors()
   abort();
 }
 
-uint64_t ConvertSignatureToUint64(const unsigned char* signature, unsigned int length)
+/*uint64_t ConvertSignatureToUint64(const unsigned char* signature, unsigned int length)
 {
   uint64_t result = 0;
   for (unsigned int i = 0; i < sizeof(uint64_t) && i < length; i++)
@@ -27,7 +27,7 @@ void ConvertSignatureToBytes(uint64_t signature_uint64, unsigned char* signature
   {
     signature_bytes[length - 1 - i] = static_cast<unsigned char>((signature_uint64 >> (i * 8)) & 0xFF);
   }
-}
+}*/
 
 int main()
 {
@@ -63,7 +63,7 @@ int main()
     handleErrors();
   }
 
-  std::cout << "変換前: ";
+  /*std::cout << "変換前: ";
   for (unsigned int i = 0; i < signatureLength; i++)
   {
     std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(signature[i]);
@@ -80,9 +80,9 @@ int main()
   {
     std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(signature_bytes[i]);
   }
-  std::cout << std::endl;
+  std::cout << std::endl;*/
 
-  if (DSA_verify(0, digest, SHA256_DIGEST_LENGTH, signature_bytes, signatureLength, dsa) != 1)
+  if (DSA_verify(0, digest, SHA256_DIGEST_LENGTH, /*signature_bytes*/signature, signatureLength, dsa) != 1)
   {
     std::cerr << "DSA signature verification failed" << std::endl;
     handleErrors();

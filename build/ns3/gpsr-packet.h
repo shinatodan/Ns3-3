@@ -11,6 +11,10 @@
 #include "ns3/nstime.h"
 #include "ns3/vector.h"
 
+#include <openssl/dsa.h>
+#include <openssl/err.h>
+#include <openssl/sha.h>
+
 namespace ns3 {
 namespace gpsr {
 
@@ -60,26 +64,24 @@ private:
 
 std::ostream & operator<< (std::ostream & os, TypeHeader const & h);
 
+
+
 class HelloHeader : public Header
 {
 public:
   /// c-tor
   //shinato
-  HelloHeader (uint64_t originPosx = 0, uint64_t originPosy = 0, uint64_t test = 0, uint64_t signature = 0, uint64_t signatureLength=0);
-  // 署名データをセットするメソッド
-  void SetSignature(const std::vector<unsigned char>& signature)
-  {
-    m_signature = signature;
-    m_signatureLength = signature.size();
-  }
+  HelloHeader (uint64_t originPosx = 0, uint64_t originPosy = 0, uint64_t node = 0, const unsigned char* signature = nullptr, unsigned int signatureLength = 0);
 
   ///\name Header serialization/deserialization
   //\{
   static TypeId GetTypeId ();
   TypeId GetInstanceTypeId () const;
   uint32_t GetSerializedSize () const;
-  void Serialize (Buffer::Iterator start) const;
-  uint32_t Deserialize (Buffer::Iterator start);
+  //shinato
+  void Serialize (Buffer::Iterator start) const override;
+  uint32_t Deserialize (Buffer::Iterator start) override;
+
   void Print (std::ostream &os) const;
   //\}
 
@@ -102,29 +104,24 @@ public:
     return m_originPosy;
   }
   //shinato
-  void Setid (uint64_t test)
+  void Setid (uint64_t node)
   {
-    testcode = test;
+    nodeid = node;
   }
   uint64_t Getid () const
   {
-    return testcode;
+    return nodeid;
   }
-  void Setmessage (uint64_t signature)
+  const unsigned char* GetSignature() const
   {
-    sign = signature;
+    return m_signature;
   }
-  uint64_t Getmessage () const
+  void SetSignatureLength (unsigned int signatureLength)
   {
-    return sign;
+    m_signatureLength = signatureLength;
   }
-  void Setmessagelength (uint64_t signatureLength)
-  {
-    signlength = signatureLength;
-  }
-  uint64_t Getmessagelength () const
-  {
-    return signlength;
+  unsigned int GetSignatureLength() const{
+    return m_signatureLength;
   }
 
   //\}
@@ -135,11 +132,9 @@ private:
   uint64_t         m_originPosx;          ///< Originator Position x
   uint64_t         m_originPosy;          ///< Originator Position x
   //shinato
-  uint64_t testcode;
-  uint64_t sign;
-  uint64_t signlength;
-  std::vector<unsigned char> m_signature;  // 署名データを保持する変数
-  unsigned int m_signatureLength;          // 署名の長さを保持する変数
+  uint64_t nodeid;
+  unsigned char m_signature[SHA256_DIGEST_LENGTH];
+  unsigned int m_signatureLength;
 };
 
 std::ostream & operator<< (std::ostream & os, HelloHeader const &);

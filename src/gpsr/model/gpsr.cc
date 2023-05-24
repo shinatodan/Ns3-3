@@ -20,6 +20,7 @@
 #include <ns3/udp-header.h>
 #include "ns3/seq-ts-header.h"
 #include <string>
+#include <iomanip>
 
 #include <openssl/dsa.h>
 #include <openssl/err.h>
@@ -736,29 +737,24 @@ RoutingProtocol::RecvGPSR (Ptr<Socket> socket)
         
         //shinato
         uint64_t nodeId = hdr.Getid(); //数字受け取り
-        //署名と署名の長さを受け取る
-        uint64_t sign = hdr.Getmessage();
-        uint64_t signlength = hdr.Getmessagelength(); 
-        //検証できる型に変換
-        unsigned char signature_bytes[sizeof(uint64_t)];
-        ConvertSignatureToBytes(sign, signature_bytes, sizeof(uint64_t));
-
-        unsigned int signature_Length;
-        signature_Length = static_cast<unsigned int>(signlength);
-
-        //helloパケットに追加する数字
         std::string nodeid = std::to_string(nodeId);//ノードIDを文字列に変換
+
         //IDのハッシュ値計算
         unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
         SHA256(reinterpret_cast<const unsigned char*>(nodeid.c_str()), nodeid.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
 
+
+        
+        //std::cout << "送信後" << hdr.GetSignatureLength() << std::endl;
+
+
         // DSA署名検証
-        if (DSA_verify(0, digest, SHA256_DIGEST_LENGTH, signature_bytes, signature_Length, dsa) != 1)//検証成功で１を返す。
+        if (DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), dsa) != 1)//検証成功で１を返す。
         {
                 std::cerr << "DSA signature verification failed" << std::endl;
                 //handleErrors();
         }
-        else if(DSA_verify(0, digest, SHA256_DIGEST_LENGTH, signature_bytes, signature_Length, dsa) == 1)
+        else if(DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), dsa) == 1)
         {
                 std::cout << "DSA signature verification succeeded" << std::endl;
                 UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
@@ -936,26 +932,6 @@ RoutingProtocol::HelloTimerExpire ()
         //HelloInterval + JITTERの遅延時間を持つ新しいタイマーを作成
         HelloIntervalTimer.Schedule (HelloInterval + JITTER);
 }
-//DSA署名をuint64_t型に変換
-uint64_t
-RoutingProtocol::ConvertSignatureToUint64(const unsigned char* signature, unsigned int length){
-        uint64_t result = 0;
-    for (unsigned int i = 0; i < sizeof(uint64_t) && i < length; i++)
-    {
-        result <<= 8;
-        result |= static_cast<uint64_t>(signature[i]);
-    }
-    return result;
-}
-// uint64_t型の署名をunsigned char[]型に変換する関数
-void 
-RoutingProtocol::ConvertSignatureToBytes(uint64_t signature_uint64, unsigned char* signature_bytes, unsigned int length)
-{
-    for (unsigned int i = 0; i < sizeof(uint64_t) && i < length; i++)
-    {
-        signature_bytes[length - 1 - i] = static_cast<unsigned char>((signature_uint64 >> (i * 8)) & 0xFF);
-    }
-}
 
 
 //Hello Packetsの送信
@@ -986,12 +962,8 @@ RoutingProtocol::SendHello ()
                 std::cerr << "Failed to generate DSA signature" << std::endl;
                 handleErrors();
         }
-        //署名をhelloに載せられる形に変換
-        uint64_t signature_uint64 = ConvertSignatureToUint64(signature, signatureLength);
-        
-        //署名の長さをhelloに載せられる形に変換
-        uint64_t signatureLengthUint64;
-        signatureLengthUint64 = static_cast<uint64_t>(signatureLength);
+
+        //std::cout << "送信前" <<  signatureLength << std::endl;
 
 	for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j != m_socketAddresses.end (); ++j)
 	{
@@ -1000,7 +972,7 @@ RoutingProtocol::SendHello ()
 
                 //shinato
                 //helloヘッダーにDSA署名を追加
-		HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY), nodeId, signature_uint64, signatureLengthUint64);
+		HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY), nodeId, signature, signatureLength);
                 
 
 		Ptr<Packet> packet = Create<Packet> ();
