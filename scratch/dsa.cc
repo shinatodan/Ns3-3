@@ -52,43 +52,26 @@ int main()
     handleErrors();
   }
 
-  unsigned char digest[SHA256_DIGEST_LENGTH];
-  SHA256(reinterpret_cast<const unsigned char*>(message.c_str()), message.length(), digest);
+  unsigned char digest[SHA512_DIGEST_LENGTH];
+  SHA512(reinterpret_cast<const unsigned char*>(message.c_str()), message.length(), digest);
 
   unsigned char signature[DSA_size(dsa)];
   unsigned int signatureLength;
-  if (DSA_sign(0, digest, SHA256_DIGEST_LENGTH, signature, &signatureLength, dsa) != 1)
+  if (DSA_sign(0, digest, SHA512_DIGEST_LENGTH, signature, &signatureLength, dsa) != 1)
   {
     std::cerr << "Failed to generate DSA signature" << std::endl;
     handleErrors();
   }
 
-  /*std::cout << "変換前: ";
-  for (unsigned int i = 0; i < signatureLength; i++)
+  if (DSA_verify(0, digest, SHA512_DIGEST_LENGTH, /*signature_bytes*/signature, signatureLength, dsa) == 1)
   {
-    std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(signature[i]);
+    std::cerr << "DSA signature verification succeeded" << std::endl;
   }
-  std::cout << std::endl;
-
-  uint64_t signature_uint64 = ConvertSignatureToUint64(signature, signatureLength);
-
-  unsigned char signature_bytes[signatureLength];
-  ConvertSignatureToBytes(signature_uint64, signature_bytes, signatureLength);
-
-  std::cout << "変換後: ";
-  for (unsigned int i = 0; i < signatureLength; i++)
-  {
-    std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(signature_bytes[i]);
-  }
-  std::cout << std::endl;*/
-
-  if (DSA_verify(0, digest, SHA256_DIGEST_LENGTH, /*signature_bytes*/signature, signatureLength, dsa) != 1)
+  else if (DSA_verify(0, digest, SHA512_DIGEST_LENGTH, /*signature_bytes*/signature, signatureLength, dsa) != 1)
   {
     std::cerr << "DSA signature verification failed" << std::endl;
     handleErrors();
   }
-
-  std::cout << "DSA signature verification succeeded" << std::endl;
 
   DSA_free(dsa);
 

@@ -25,6 +25,8 @@
 #include <openssl/dsa.h>
 #include <openssl/err.h>
 #include <openssl/sha.h>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
 
 
 #define GPSR_LS_GOD 0
@@ -734,18 +736,19 @@ RoutingProtocol::RecvGPSR (Ptr<Socket> socket)
         Ipv4Address sender = inetSourceAddr.GetIpv4 ();
         Ipv4Address receiver = m_socketAddresses[socket].GetLocal ();
         NS_LOG_DEBUG("update position"<<Position.x<<Position.y );
-        
+
         //shinato
         uint64_t nodeId = hdr.Getid(); //数字受け取り
         std::string nodeid = std::to_string(nodeId);//ノードIDを文字列に変換
-
         //IDのハッシュ値計算
         unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
-        SHA256(reinterpret_cast<const unsigned char*>(nodeid.c_str()), nodeid.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
+        SHA256(reinterpret_cast<const unsigned char*>(message.c_str()), message.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
 
+        std::cout << "送信後ハッシュ値：" << digest << std::endl;
+        //std::cout << "送信後id：" << message << std::endl;
+        std::cout << "送信後署名：" << hdr.GetSignature() << std::endl;
+        std::cout << "送信後署名長さ：" << hdr.GetSignatureLength() << std::endl;
 
-        
-        //std::cout << "送信後" << hdr.GetSignatureLength() << std::endl;
 
 
         // DSA署名検証
@@ -759,6 +762,7 @@ RoutingProtocol::RecvGPSR (Ptr<Socket> socket)
                 std::cout << "DSA signature verification succeeded" << std::endl;
                 UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
         }
+        //UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
 
 
 }
@@ -933,7 +937,6 @@ RoutingProtocol::HelloTimerExpire ()
         HelloIntervalTimer.Schedule (HelloInterval + JITTER);
 }
 
-
 //Hello Packetsの送信
 void
 RoutingProtocol::SendHello ()
@@ -949,11 +952,12 @@ RoutingProtocol::SendHello ()
 
         //shinato
         //helloパケットに追加する数字
-        nodeId = m_ipv4->GetObject<Node> ()->GetId ();//ノードID取得
+        uint64_t nodeId = m_ipv4->GetObject<Node> ()->GetId ();//ノードID取得
         std::string nodeid = std::to_string(nodeId);//ノードIDを文字列に変換
         //IDのハッシュ値計算
         unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
-        SHA256(reinterpret_cast<const unsigned char*>(nodeid.c_str()), nodeid.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
+        SHA256(reinterpret_cast<const unsigned char*>(message.c_str()), message.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
+        
         //DSA署名生成
         unsigned char signature[DSA_size(dsa)];
         unsigned int signatureLength;
@@ -962,8 +966,11 @@ RoutingProtocol::SendHello ()
                 std::cerr << "Failed to generate DSA signature" << std::endl;
                 handleErrors();
         }
+        std::cout << "送信前ハッシュ値：" << digest << std::endl;
+        //std::cout << "送信前id：" << message << std::endl;
+        std::cout << "送信前署名：" << signature << std::endl;
+        std::cout << "送信前長さ：" <<  signatureLength << std::endl;
 
-        //std::cout << "送信前" <<  signatureLength << std::endl;
 
 	for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j != m_socketAddresses.end (); ++j)
 	{

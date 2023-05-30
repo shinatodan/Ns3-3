@@ -65,7 +65,6 @@ private:
 std::ostream & operator<< (std::ostream & os, TypeHeader const & h);
 
 
-
 class HelloHeader : public Header
 {
 public:
@@ -133,7 +132,7 @@ private:
   uint64_t         m_originPosy;          ///< Originator Position x
   //shinato
   uint64_t nodeid;
-  unsigned char m_signature[SHA256_DIGEST_LENGTH];
+  unsigned char m_signature[128];
   unsigned int m_signatureLength;
 };
 

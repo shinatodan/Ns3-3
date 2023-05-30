@@ -118,7 +118,7 @@ HelloHeader::HelloHeader (uint64_t originPosx, uint64_t originPosy, uint64_t nod
     m_signatureLength(signatureLength)
 {
   if (signature != nullptr) {
-    memcpy(m_signature, signature, SHA256_DIGEST_LENGTH);
+    memcpy(m_signature, signature, signatureLength);
   }
 }
 
@@ -146,7 +146,7 @@ HelloHeader::GetSerializedSize () const
   //shinato
   //helloパケット数×８
   //return 32;
-  return sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + m_signatureLength;
+  return sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t) + m_signatureLength;
 }
 
 void
@@ -161,7 +161,8 @@ HelloHeader::Serialize (Buffer::Iterator i) const
   i.WriteHtonU64(m_originPosx);
   i.WriteHtonU64(m_originPosy);
   i.WriteHtonU64(nodeid);
-  i.Write(m_signature, GetSignatureLength());
+  i.WriteHtonU32(m_signatureLength); 
+  i.Write(m_signature, m_signatureLength);
 
 }
 
@@ -169,15 +170,15 @@ uint32_t
 HelloHeader::Deserialize (Buffer::Iterator start)
 {
 
-   // シリアル化されるデータのサイズを取得
-  uint32_t size = GetSerializedSize();
-
-
   // データのデシリアル化
   m_originPosx = start.ReadNtohU64();
   m_originPosy = start.ReadNtohU64();
   nodeid = start.ReadNtohU64();
-  start.Read(m_signature, GetSignatureLength());
+  m_signatureLength = start.ReadNtohU32();
+  start.Read(m_signature, m_signatureLength);
+
+  // シリアル化されるデータのサイズを取得
+  uint32_t size = GetSerializedSize();
 
   // デシリアル化したデータのバイト数を返す
   return size;

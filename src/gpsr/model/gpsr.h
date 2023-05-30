@@ -126,9 +126,9 @@ private:
   void CheckQueue ();
 
   void RecoveryMode(Ipv4Address dst, Ptr<Packet> p, UnicastForwardCallback ucb, Ipv4Header header);
-  
+
   //shinato
-  uint64_t nodeId = 0;  //ノードID取得用変数
+  std::string message = "こんにちは";
   
   
   uint32_t MaxQueueLen;                  ///<ルーティング プロトコルがバッファできるパケットの最大数
