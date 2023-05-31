@@ -41,9 +41,8 @@ namespace gpsr {
  */
 class RoutingProtocol : public Ipv4RoutingProtocol
 {
-  //shinato
   DSA* dsa;
-public:
+public://コンストラクタ
   static TypeId GetTypeId (void);
   static const uint32_t GPSR_PORT;
 
@@ -74,6 +73,8 @@ public:
   virtual bool IsMyOwnAddress (Ipv4Address src);
   //shinato
   virtual void handleErrors();
+  std::string ConvertToHex(const unsigned char* data, size_t length);
+
 
   Ptr<Ipv4> m_ipv4;
   /// 各インターフェースごとrawソケット, マップソケット -> iface address (IP + mask)
@@ -102,7 +103,7 @@ public:
   }
 
 
-private:
+private://データメンバ
   ///　プロトコル操作を開始
   void Start ();
   ///　パケットをキューに入れ、ルート リクエストを送信します
@@ -128,6 +129,8 @@ private:
   void RecoveryMode(Ipv4Address dst, Ptr<Packet> p, UnicastForwardCallback ucb, Ipv4Header header);
 
   //shinato
+  //shinato
+  void GenerateKeys();
   std::string message = "こんにちは";
   
   

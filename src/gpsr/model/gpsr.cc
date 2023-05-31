@@ -97,10 +97,8 @@ Ptr<UniformRandomVariable> x = CreateObject<UniformRandomVariable> ();
 
 
 NS_OBJECT_ENSURE_REGISTERED (RoutingProtocol);
-
 /// IANAではまだ定義されていない、GPSR制御トラフィックのUDPポート
 const uint32_t RoutingProtocol::GPSR_PORT = 666;
-
 //初期化
 RoutingProtocol::RoutingProtocol ()
         : HelloInterval (Seconds (1.0)),
@@ -111,25 +109,7 @@ RoutingProtocol::RoutingProtocol ()
         PerimeterMode (false)
 {
         m_neighbors = PositionTable ();
-
-        //shinato
-        // DSA鍵の生成
-        dsa = DSA_new();//DSAキーオブジェクト　下記で生成したDSA鍵ペア、DSAパラメータを格納
-        if (dsa == nullptr)
-        {
-                std::cerr << "Failed to create DSA key" << std::endl;
-                handleErrors();
-        }
-        if (DSA_generate_parameters_ex(dsa, 2048/*DSAパラメータのビット長*/, nullptr, 0, nullptr, nullptr, nullptr) != 1)//DSAパラメータ(p,q,g)生成
-        {
-                std::cerr << "Failed to generate DSA parameters" << std::endl;
-                handleErrors();
-        }
-        if (DSA_generate_key(dsa) != 1)//DSA鍵ペア生成(x,y)
-        {
-                std::cerr << "Failed to generate DSA key pair" << std::endl;
-                handleErrors();
-        }
+        GenerateKeys();
 }
 
 
@@ -180,13 +160,29 @@ RoutingProtocol::SetLS (Ptr<LocationService> locationService)
 }
 
 //shinato
+void RoutingProtocol::GenerateKeys() {  //DSA鍵の生成
+  dsa = DSA_new();
+  if (dsa == nullptr) {
+    std::cerr << "Failed to create DSA key" << std::endl;
+    handleErrors();
+  }
+  if (DSA_generate_parameters_ex(dsa, 2048, nullptr, 0, nullptr, nullptr, nullptr) != 1) {
+    std::cerr << "Failed to generate DSA parameters" << std::endl;
+    handleErrors();
+  }
+  if (DSA_generate_key(dsa) != 1) {
+    std::cerr << "Failed to generate DSA key pair" << std::endl;
+    handleErrors();
+  }
+}
 void RoutingProtocol::handleErrors()//openSSlのエラー処理
 {
   ERR_print_errors_fp(stderr);
   abort();
 }
 //バイナリデータを16進数文字列に変換する関数
-std::string ConvertToHex(const unsigned char* data, size_t length){
+std::string 
+RoutingProtocol::ConvertToHex(const unsigned char* data, size_t length){
         std::stringstream ss;
         ss << std::hex << std::setfill('0');
         for (size_t i = 0; i < length; ++i) {
