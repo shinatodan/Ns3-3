@@ -185,6 +185,16 @@ void RoutingProtocol::handleErrors()//openSSlのエラー処理
   ERR_print_errors_fp(stderr);
   abort();
 }
+//バイナリデータを16進数文字列に変換する関数
+std::string ConvertToHex(const unsigned char* data, size_t length){
+        std::stringstream ss;
+        ss << std::hex << std::setfill('0');
+        for (size_t i = 0; i < length; ++i) {
+        ss << std::setw(2) << static_cast<int>(data[i]);
+        }
+        return ss.str();
+}
+
 
 //ノードがパケットを受信し、そのパケットを転送する必要がある場合（自分が宛先ノードでない場合）
 bool RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header, Ptr<const NetDevice> idev,
@@ -744,10 +754,13 @@ RoutingProtocol::RecvGPSR (Ptr<Socket> socket)
         unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
         SHA256(reinterpret_cast<const unsigned char*>(message.c_str()), message.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
 
-        std::cout << "送信後ハッシュ値：" << digest << std::endl;
-        //std::cout << "送信後id：" << message << std::endl;
-        std::cout << "送信後署名：" << hdr.GetSignature() << std::endl;
+        std::string signatureText = ConvertToHex(hdr.GetSignature(), hdr.GetSignatureLength());
+        std::cout << "送信後署名: " << signatureText << std::endl;
+        std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
+        std::cout << "送信後ハッシュ値: " << hashText << std::endl;
         std::cout << "送信後署名長さ：" << hdr.GetSignatureLength() << std::endl;
+        std::cout << "送信後ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
+        std::cout << "送信後鍵：" << dsa << std::endl;
 
 
 
@@ -966,10 +979,14 @@ RoutingProtocol::SendHello ()
                 std::cerr << "Failed to generate DSA signature" << std::endl;
                 handleErrors();
         }
-        std::cout << "送信前ハッシュ値：" << digest << std::endl;
-        //std::cout << "送信前id：" << message << std::endl;
-        std::cout << "送信前署名：" << signature << std::endl;
-        std::cout << "送信前長さ：" <<  signatureLength << std::endl;
+        std::string signatureText = ConvertToHex(signature, signatureLength);
+        std::cout << "送信前署名: " << signatureText << std::endl;
+        std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
+        std::cout << "送信前ハッシュ値: " << hashText << std::endl;
+        std::cout << "送信前署名長さ：" << signatureLength << std::endl;
+        std::cout << "送信前ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
+        std::cout << "送信前鍵：" << dsa << std::endl;
+
 
 
 	for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j != m_socketAddresses.end (); ++j)
