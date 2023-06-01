@@ -39,6 +39,7 @@ namespace gpsr {
  *
  * \brief GPSR routing protocol
  */
+
 class RoutingProtocol : public Ipv4RoutingProtocol
 {
   DSA* dsa;
@@ -128,9 +129,10 @@ private://データメンバ
 
   void RecoveryMode(Ipv4Address dst, Ptr<Packet> p, UnicastForwardCallback ucb, Ipv4Header header);
 
-  //shinato
-  //shinato
   void GenerateKeys();
+
+  //shinato
+  
   std::string message = "こんにちは";
   
   
