@@ -302,6 +302,18 @@ RoutingHelper::ConfigureRoutingProtocol (NodeContainer& c)
     internet.Install(c);//各ノードに(Ipv4,Ipv6,Udp,Tcp)クラスの実装を集約する
     GetRoutingStats().SetCport(698);
   }else if(m_protocolName=="GPSR"){
+    DSA* dsa = DSA_new();
+    if (dsa == nullptr) {
+      std::cerr << "Failed to create DSA key" << std::endl;
+    }
+    if (DSA_generate_parameters_ex(dsa, 2048, nullptr, 0, nullptr, nullptr, nullptr) != 1) {
+      std::cerr << "Failed to generate DSA parameters" << std::endl;
+    }
+    if (DSA_generate_key(dsa) != 1) {
+      std::cerr << "Failed to generate DSA key pair" << std::endl;
+    }
+    gpsr.SetDsaParameter(dsa);
+
     list.Add (gpsr, 100);//dsdvルーティングヘルパーとその優先度(100)を格納する
     internet.SetRoutingHelper (list);//インストール時に使用するルーティングヘルパーを設定する
     internet.Install(c);//各ノードに(Ipv4,Ipv6,Udp,Tcp)クラスの実装を集約する

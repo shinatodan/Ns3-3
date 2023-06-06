@@ -75,6 +75,15 @@ public://コンストラクタ
   //shinato
   virtual void handleErrors();
   std::string ConvertToHex(const unsigned char* data, size_t length);
+  void SetDsaParameter(DSA* parameter)
+  {
+    dsa = parameter;
+  }
+
+  DSA* GetDsaParameter() const
+  {
+    return dsa;
+  }
 
 
   Ptr<Ipv4> m_ipv4;

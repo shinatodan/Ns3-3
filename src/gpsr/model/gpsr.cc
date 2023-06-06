@@ -109,7 +109,7 @@ RoutingProtocol::RoutingProtocol ()
         PerimeterMode (false)
 {
         m_neighbors = PositionTable ();
-        GenerateKeys();
+        //GenerateKeys();
 }
 
 
@@ -160,7 +160,7 @@ RoutingProtocol::SetLS (Ptr<LocationService> locationService)
 }
 
 //shinato
-void RoutingProtocol::GenerateKeys() {  //DSA鍵の生成
+/*void RoutingProtocol::GenerateKeys() {  //DSA鍵の生成
   dsa = DSA_new();
   if (dsa == nullptr) {
     std::cerr << "Failed to create DSA key" << std::endl;
@@ -174,7 +174,7 @@ void RoutingProtocol::GenerateKeys() {  //DSA鍵の生成
     std::cerr << "Failed to generate DSA key pair" << std::endl;
     handleErrors();
   }
-}
+}*/
 void RoutingProtocol::handleErrors()//openSSlのエラー処理
 {
   ERR_print_errors_fp(stderr);
@@ -756,17 +756,17 @@ RoutingProtocol::RecvGPSR (Ptr<Socket> socket)
         std::cout << "送信後ハッシュ値: " << hashText << std::endl;
         std::cout << "送信後署名長さ：" << hdr.GetSignatureLength() << std::endl;
         std::cout << "送信後ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
-        std::cout << "送信後鍵：" << dsa << std::endl;
+        std::cout << "送信後鍵：" << GetDsaParameter() << std::endl;
 
 
 
         // DSA署名検証
-        if (DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), dsa) != 1)//検証成功で１を返す。
+        if (DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), GetDsaParameter()) != 1)//検証成功で１を返す。
         {
                 std::cerr << "DSA signature verification failed" << std::endl;
                 //handleErrors();
         }
-        else if(DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), dsa) == 1)
+        else if(DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), GetDsaParameter()) == 1)
         {
                 std::cout << "DSA signature verification succeeded" << std::endl;
                 UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
@@ -968,9 +968,9 @@ RoutingProtocol::SendHello ()
         SHA256(reinterpret_cast<const unsigned char*>(message.c_str()), message.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
         
         //DSA署名生成
-        unsigned char signature[DSA_size(dsa)];
+        unsigned char signature[DSA_size(GetDsaParameter())];
         unsigned int signatureLength;
-        if (DSA_sign(0, digest, SHA256_DIGEST_LENGTH, signature, &signatureLength, dsa) != 1)
+        if (DSA_sign(0, digest, SHA256_DIGEST_LENGTH, signature, &signatureLength, GetDsaParameter()) != 1)
         {
                 std::cerr << "Failed to generate DSA signature" << std::endl;
                 handleErrors();
@@ -981,7 +981,7 @@ RoutingProtocol::SendHello ()
         std::cout << "送信前ハッシュ値: " << hashText << std::endl;
         std::cout << "送信前署名長さ：" << signatureLength << std::endl;
         std::cout << "送信前ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
-        std::cout << "送信前鍵：" << dsa << std::endl;
+        std::cout << "送信前鍵：" << GetDsaParameter() << std::endl;
 
 
 
