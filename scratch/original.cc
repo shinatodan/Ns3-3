@@ -27,6 +27,10 @@
 #include "ns3/netanim-module.h"
 #include <string>
 
+#include <openssl/dsa.h>
+#include <openssl/err.h>
+#include <openssl/sha.h>
+
 //原型シナリオファイル
 
 
