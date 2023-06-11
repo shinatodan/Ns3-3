@@ -52,6 +52,8 @@ NGpsrHelper::Create (Ptr<Node> node) const
   node->AggregateObject (ngpsr);
   //shinato
   ngpsr->SetDsaParameterIP(m_dsaParameter); // m_dsaParameterの設定
+  ngpsr->SetDsaSignatureIP(m_dsaSignatureIP);
+  ngpsr->SetDsaSignatureLengthIP(m_dsaSignatureLengthIP);
   return ngpsr;
 }
 
@@ -69,7 +71,23 @@ DSA* NGpsrHelper::GetDsaParameterIP() const {
   return m_dsaParameter;
 }
 
+void NGpsrHelper::SetDsaSignatureIP(const unsigned char* signature)
+{
+    memcpy(m_dsaSignatureIP, signature, 128);
+}
+const unsigned char* NGpsrHelper::GetDsaSignatureIP() const
+{
+    return m_dsaSignatureIP;
+}
 
+void NGpsrHelper::SetDsaSignatureLengthIP(unsigned int length)
+{
+    m_dsaSignatureLengthIP = length;
+}
+unsigned int NGpsrHelper::GetDsaSignatureLengthIP() const
+{
+    return m_dsaSignatureLengthIP;
+}
 
 
 void

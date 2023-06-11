@@ -22,6 +22,7 @@
 #include <string>
 #include <iomanip>
 
+
 #include <openssl/dsa.h>
 #include <openssl/err.h>
 #include <openssl/sha.h>
@@ -728,18 +729,20 @@ RoutingProtocol::RecvNGPSR (Ptr<Socket> socket)
 
         //shinato
         uint64_t nodeId = hdr.Getid(); //数字受け取り
-        std::string nodeid = std::to_string(nodeId);//ノードIDを文字列に変換
+        //std::string nodeid = std::to_string(nodeId);//ノードIDを文字列に変換
+        std::string nodeid = "NGPSR";
+
         //IDのハッシュ値計算
         unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
         SHA256(reinterpret_cast<const unsigned char*>(nodeid.c_str()), nodeid.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
 
-        std::string signatureText = ConvertToHex(hdr.GetSignature(), hdr.GetSignatureLength());
-        std::cout << "送信後署名: " << signatureText << std::endl;
-        std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
-        std::cout << "送信後ハッシュ値: " << hashText << std::endl;
-        std::cout << "送信後署名長さ：" << hdr.GetSignatureLength() << std::endl;
-        std::cout << "送信後ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
-        std::cout << "送信後鍵：" << GetDsaParameterIP() << std::endl;
+        //std::string signatureText = ConvertToHex(hdr.GetSignature(), hdr.GetSignatureLength());
+        //std::cout << "送信後署名: " << signatureText << std::endl;
+        //std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
+        //std::cout << "送信後ハッシュ値: " << hashText << std::endl;
+        //std::cout << "送信後署名長さ：" << hdr.GetSignatureLength() << std::endl;
+        //std::cout << "送信後ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
+        //std::cout << "送信後鍵：" << GetDsaParameterIP() << std::endl;
 
 
 
@@ -946,7 +949,7 @@ RoutingProtocol::SendHello ()
         //helloパケットに追加する数字
         uint64_t nodeId = m_ipv4->GetObject<Node> ()->GetId ();//ノードID取得
         std::string nodeid = std::to_string(nodeId);//ノードIDを文字列に変換
-        //IDのハッシュ値計算
+        /*//IDのハッシュ値計算
         unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
         SHA256(reinterpret_cast<const unsigned char*>(nodeid.c_str()), nodeid.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
         
@@ -957,14 +960,24 @@ RoutingProtocol::SendHello ()
         {
                 std::cerr << "Failed to generate DSA signature" << std::endl;
                 handleErrors();
-        }
-        std::string signatureText = ConvertToHex(signature, signatureLength);
-        std::cout << "送信前署名: " << signatureText << std::endl;
-        std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
-        std::cout << "送信前ハッシュ値: " << hashText << std::endl;
-        std::cout << "送信前署名長さ：" << signatureLength << std::endl;
-        std::cout << "送信前ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
-        std::cout << "送信前鍵：" << GetDsaParameterIP() << std::endl;
+        }*/
+
+        // 署名と長さを取得する
+        //unsigned char* signature = GetDsaSignatureIP();
+        //unsigned int signatureLength = GetDsaSignatureLengthIP();
+        // 署名と長さを取得する
+
+        const unsigned char* signature = GetDsaSignatureIP();
+        unsigned int signatureLength = GetDsaSignatureLengthIP();
+
+
+        //std::string signatureText = ConvertToHex(signature, signatureLength);
+        //std::cout << "送信前署名: " << signatureText << std::endl;
+        //std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
+        //std::cout << "送信前ハッシュ値: " << hashText << std::endl;
+        //std::cout << "送信前署名長さ：" << signatureLength << std::endl;
+        //std::cout << "送信前ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
+        //std::cout << "送信前鍵：" << GetDsaParameterIP() << std::endl;
 
 
 

@@ -68,11 +68,18 @@ public:
   void SetDsaParameterIP(DSA* parameter);
   DSA* GetDsaParameterIP() const;
 
+  void SetDsaSignatureIP(const unsigned char* signature);
+  const unsigned char* GetDsaSignatureIP() const;
+  void SetDsaSignatureLengthIP(unsigned int length);
+  unsigned int GetDsaSignatureLengthIP() const;
+
   void Install (void) const;
 
 private:
   ObjectFactory m_agentFactory;
   DSA* m_dsaParameter;
+  unsigned char m_dsaSignatureIP[128];
+  unsigned int m_dsaSignatureLengthIP;
 };
 
 }

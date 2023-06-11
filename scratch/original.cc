@@ -27,6 +27,8 @@
 #include "ns3/ns2-mobility-helper.h"
 #include "ns3/netanim-module.h"
 #include <string>
+#include <iomanip>
+
 
 #include <openssl/dsa.h>
 #include <openssl/err.h>
@@ -215,6 +217,8 @@ public:
 
     RoutingStats & GetRoutingStats ();
 
+    std::string ConvertToHex(const unsigned char* data, size_t length);
+
 private:
 
   void ConfigureRoutingProtocol (NodeContainer &c);
@@ -342,10 +346,24 @@ RoutingHelper::ConfigureRoutingProtocol (NodeContainer& c)
     ngpsr.SetDsaParameterIP(dsa_ip);//IPアドレス署名用のパラメーター
 
     //署名生成（IP)
+    unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
+    SHA256(reinterpret_cast<const unsigned char*>(m_protocolName.c_str()), m_protocolName.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
+        
+    unsigned char signature[DSA_size(dsa_ip)];
+    unsigned int signatureLength;
+    if (DSA_sign(0, digest, SHA256_DIGEST_LENGTH, signature, &signatureLength, dsa_ip) != 1)
+    {
+        std::cerr << "Failed to generate DSA signature" << std::endl;
+    }
+    ngpsr.SetDsaSignatureIP(signature);
+    ngpsr.SetDsaSignatureLengthIP(signatureLength);
 
-
-
-
+    /*std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
+    std::cout << "送信前ハッシュ値: " << hashText << std::endl;
+    std::cout << "送信前鍵: " << dsa_ip << std::endl;
+    std::string signatureText = ConvertToHex(signature, signatureLength);
+    std::cout << "送信前署名: " << signatureText << std::endl;*/
+    
     list.Add (ngpsr, 100);//dsdvルーティングヘルパーとその優先度(100)を格納する
     internet.SetRoutingHelper (list);//インストール時に使用するルーティングヘルパーを設定する
     internet.Install(c);//各ノードに(Ipv4,Ipv6,Udp,Tcp)クラスの実装を集約する
@@ -355,7 +373,15 @@ RoutingHelper::ConfigureRoutingProtocol (NodeContainer& c)
     NS_FATAL_ERROR ("No such protocol:" << m_protocolName);//致命的なエラーをメッセージNo such protocolで報告する
   }
 
-
+}
+std::string 
+RoutingHelper::ConvertToHex(const unsigned char* data, size_t length){
+        std::stringstream ss;
+        ss << std::hex << std::setfill('0');
+        for (size_t i = 0; i < length; ++i) {
+        ss << std::setw(2) << static_cast<int>(data[i]);
+        }
+        return ss.str();
 }
 
 void
@@ -520,7 +546,7 @@ private:
 VanetRoutingExperiment::VanetRoutingExperiment ()//コンストラクターパラメータの初期化
 : m_port (9),//ポート番号を9で初期化
 m_nNodes (5),//ノード数を10で初期化
-m_protocolName ("GPSR"),//プロトコル名を"GPSR"で初期化
+m_protocolName ("NGPSR"),//プロトコル名を"GPSR"で初期化
 m_txp (16.026),//送信電力(dB)を16で初期化
 m_EDT (-96),
 m_lossModelName ("ns3::LogDistancePropagationLossModel"),//電波伝搬損失モデルの名前を""で初期化

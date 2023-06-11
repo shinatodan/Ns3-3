@@ -100,12 +100,12 @@ private:
     std::string rate;
     std::string phyMode;
     std::string packetSize;
-    NetDeviceContainer adhocDevice;
-    Ipv4InterfaceContainer adhocInterfaces;
+    NetDeviceContainer adhocDevice;//アドホック送信デバイス
+    Ipv4InterfaceContainer adhocInterfaces;//アドホック送信インターフェイス
     NodeContainer adhocNodes;
     NodeContainer stopDevice;
-    FlowMonitorHelper *flowMonitorHelper;
-    Ptr<FlowMonitor>   flowMonitor;
+    FlowMonitorHelper *m_flowMonitorHelper;
+    Ptr<FlowMonitor>   m_flowMonitor;
     Ptr<WifiPhyStats> m_wifiPhyStats;
     //出力値
     double m_pdr;
@@ -115,7 +115,6 @@ private:
     double m_packetLoss;
     double m_numHops;
     std::string traceFile;
-
 };
 
 VanetRoutingExperiment::VanetRoutingExperiment()//コンストラクタパラメータ初期化
@@ -181,8 +180,8 @@ void
 VanetRoutingExperiment::ConfigureDefaults ()//デフォルトの属性を設定する
 {
     Config::SetDefault ("ns3::WifiRemoteStationManager::NonUnicastMode",StringValue (phyMode));//ユニキャスト以外の送信に使用されるwifiモードを変調方式ofdm,レート6Mbps,帯域幅10MHzとする
-    Config::SetDefault ("ns3::WifiRemoteStationManager::FragmentationThreshold", StringValue ("22000"));// disable fragmentation for frames below 2200 bytes
-    Config::SetDefault ("ns3::WifiRemoteStationManager::RtsCtsThreshold", StringValue ("2200"));// turn off RTS/CTS for frames below 2200 bytes
+    //Config::SetDefault ("ns3::WifiRemoteStationManager::FragmentationThreshold", StringValue ("22000"));// disable fragmentation for frames below 2200 bytes
+    //Config::SetDefault ("ns3::WifiRemoteStationManager::RtsCtsThreshold", StringValue ("2200"));// turn off RTS/CTS for frames below 2200 bytes
     Config::SetDefault ("ns3::OnOffApplication::PacketSize",StringValue (packetSize));
     Config::SetDefault ("ns3::OnOffApplication::DataRate",  StringValue (rate));
 }
@@ -275,6 +274,22 @@ VanetRoutingExperiment::ConfigureNetwork ()
     InternetStackHelper internet;
     Ipv4AddressHelper ipv4;
 
+    ipv4.SetBase ("192.168.1.0", "255.255.255.0");
+
+    //鍵生成（IP)
+    DSA* dsa_ip = DSA_new();
+    if (dsa_ip == nullptr) {
+      std::cerr << "Failed to create DSA key" << std::endl;
+    }
+    if (DSA_generate_parameters_ex(dsa_ip, 2048, nullptr, 0, nullptr, nullptr, nullptr) != 1) {
+      std::cerr << "Failed to generate DSA parameters" << std::endl;
+    }
+    if (DSA_generate_key(dsa_ip) != 1) {
+      std::cerr << "Failed to generate DSA key pair" << std::endl;
+    }
+    ngpsr.SetDsaParameterIP(dsa_ip);//IPアドレス署名用のパラメーター
+
+
 
     if(protocolName=="AODV"){
         list.Add (aodv, 100);//aodvルーティングヘルパーとその優先度(100)を格納する
@@ -296,8 +311,7 @@ VanetRoutingExperiment::ConfigureNetwork ()
         internet.Install(adhocNodes);//各ノードに(Ipv4,Ipv6,Udp,Tcp)クラスの実装を集約する
     }
 
-    ipv4.SetBase ("192.168.1.0", "255.255.255.0");
-	  adhocInterfaces = ipv4.Assign (adhocDevice);//IPアドレス割当
+	adhocInterfaces = ipv4.Assign (adhocDevice);//IPアドレス割当
 }
 
 void 
@@ -339,8 +353,8 @@ VanetRoutingExperiment::RunSimulation ()
 {
     NS_LOG_INFO ("Run Simulation.");//メッセージ"Run Simulation"をログに記録する
 
-    flowMonitorHelper = new FlowMonitorHelper;
-    flowMonitor = flowMonitorHelper->InstallAll();//全てのノードにフローモニター装着
+    m_flowMonitorHelper = new FlowMonitorHelper;
+    m_flowMonitor = m_flowMonitorHelper->InstallAll();//全てのノードにフローモニター装着
 
     Simulator::Stop (Seconds (totalSimTime));//シミュレーションが停止するまでの時間をスケジュールする
     Simulator::Run ();//シミュレーションを実行する
@@ -348,7 +362,7 @@ VanetRoutingExperiment::RunSimulation ()
     Simulator::Destroy ();//シミュレーションの最後に呼び出す
 }
 
-void
+/*void
 VanetRoutingExperiment::RunFlowMonitor()
 {
     int countFlow=0;
@@ -392,11 +406,11 @@ VanetRoutingExperiment::RunFlowMonitor()
     m_overHead = ((double(m_wifiPhyStats->GetPhyTxBytes()-sumTxBytes))/m_wifiPhyStats->GetPhyTxBytes())*100;
     if(m_overHead<0.0)
         m_overHead=0.0;
-        m_delay = ((sumDelay.GetSeconds()/sumRxPackets))*1000;
+    m_delay = ((sumDelay.GetSeconds()/sumRxPackets))*1000;
     if(std::isnan(m_delay))
         m_delay=0.0;
-        m_packetLoss = (double(sumLostPackets)/sumTxPackets)*100;
-        m_numHops = 1.0+double(sumTimesForwarded)/sumRxPackets;
+    m_packetLoss = (double(sumLostPackets)/sumTxPackets)*100;
+    m_numHops = 1.0+double(sumTimesForwarded)/sumRxPackets;
     if(std::isnan(m_numHops))
         m_numHops=0.0;
 
@@ -418,7 +432,107 @@ VanetRoutingExperiment::RunFlowMonitor()
     std::cout<<"送信パケット数合計"<<sumTxPackets<<std::endl;
     std::cout<<"受信パケット数合計"<<sumRxPackets<<std::endl;
     std::cout<<"送信オーバーヘッド合計"<<sumOverHead<<std::endl;
-}
+}*/
+void
+  VanetRoutingExperiment::RunFlowMonitor()
+  {
+    int countFlow=0;
+    double sumThroughput=0;
+    uint64_t sumTxBytes=0;
+    uint64_t sumRxBytes=0;
+    uint32_t sumTimesForwarded=0;
+    uint32_t sumLostPackets=0;
+    uint32_t sumTxPackets=0;
+    uint32_t sumRxPackets=0;
+    Time sumDelay;
+
+    uint64_t sumOverHead=0;
+    
+      Ptr<Ipv4FlowClassifier> flowClassifier = DynamicCast<Ipv4FlowClassifier> (m_flowMonitorHelper->GetClassifier ());//GetClassifierメソッドでFlowClassifierオブジェクトを取得
+      //IPv4FlowClassifierにキャストする
+      std::map<FlowId, FlowMonitor::FlowStats> stats = m_flowMonitor->GetFlowStats ();//収集されたすべてのフロー統計を取得する
+
+      for (std::map<FlowId, FlowMonitor::FlowStats>::const_iterator i=stats.begin (); i != stats.end (); i++) //stats(フロー統計)の要素分ループする
+      {
+
+        Ipv4FlowClassifier::FiveTuple t = flowClassifier->FindFlow (i->first);//各stats(フロー統計)のフローIdに対応するFiveTupleを検索する
+        //FiveTuple(宛先アドレス,送信元アドレス,宛先ポート番号,送信元ポート番号)
+
+        if(t.destinationPort==Port)
+        {//セッションの送信元IPアドレス,宛先アドレスが検索したものと一致した時
+
+          countFlow ++;
+
+          double throughput = double(i->second.rxBytes *8.0)/(i->second.timeLastRxPacket.GetSeconds () - i->second.timeFirstTxPacket.GetSeconds ())/1024;
+          //rxBytesはこのフローの受信バイトの合計数,timeLastRxPacketはフローで最後のパケットが受信されたときの時間
+          //timeFirstTxPacketはフローで最初のパケットが送信された時の時間
+          //throughput=受信パケットのバイト数 *8.0/通信時間/1024
+          sumThroughput+= throughput;//スループットの合計
+
+          sumTxBytes += i->second.txBytes;//txBytesはこのフローの送信バイトの合計数,
+
+          sumRxBytes += i->second.rxBytes;//rxBytesはこのフローの受信バイトの合計数
+
+          sumTimesForwarded += i->second.timesForwarded;//転送回数の合計(ホップ数の合計)
+
+          sumLostPackets +=  i->second.lostPackets;//失われたとパケットの数
+
+          sumTxPackets += i->second.txPackets;//txPacketsは送信パケットの合計
+
+          sumRxPackets += i->second.rxPackets;//rxPacketsは受信パケットの合計
+
+          sumDelay += i->second.delaySum;//delaySumはすべてのエンドツーエンド通信の遅延の合計
+
+        }else /*if(t.destinationPort==m_routingHelper->GetRoutingStats().GetCport())*/{
+          sumOverHead+=i->second.txBytes;
+        }
+
+      }
+
+    //}
+    m_throughput = sumThroughput;
+
+    m_pdr = (double(sumRxBytes)/sumTxBytes)*100.0;
+
+  m_overHead = ((double(m_wifiPhyStats->GetPhyTxBytes()-sumTxBytes))/m_wifiPhyStats->GetPhyTxBytes())*100;
+  //  m_overHead=double(sumOverHead)/(sumOverHead+sumTxBytes);
+    if(m_overHead<0.0)
+      m_overHead=0.0;
+
+    m_delay = ((sumDelay.GetSeconds()/sumRxPackets))*1000;
+    //if(isnan(m_delay))
+    if(std::isnan(m_delay))
+      m_delay=0.0;
+
+    m_packetLoss = (double(sumLostPackets)/sumTxPackets)*100;
+
+    m_numHops = 1.0+double(sumTimesForwarded)/sumRxPackets;
+    //if(isnan(m_numHops))
+    if(std::isnan(m_numHops))
+      m_numHops=0.0;
+
+    std::cout<<"スループット(kbps)"<<m_throughput<<std::endl;
+    std::cout<<"配送率"<<m_pdr<<std::endl;
+    std::cout<<"オーバーヘッド割合"<<m_overHead<<std::endl;
+    std::cout<<"平均遅延(ms)"<<m_delay<<std::endl;
+    std::cout<<"パケットロス率"<<m_packetLoss<<std::endl;
+    std::cout<<"平均ホップ数"<<m_numHops<<std::endl;
+    std::cout<<"フロー数"<<countFlow<<std::endl;
+    std::cout<<"オーバーヘッドも含めた送信バイト合計"<<m_wifiPhyStats->GetPhyTxBytes()<<std::endl;
+    std::cout<<std::endl;
+    std::cout<<"データパケット----------------------"<<std::endl;
+    std::cout<<"送信バイト合計:"<<sumTxBytes<<std::endl;
+    std::cout<<"受信バイト合計:"<<sumRxBytes<<std::endl;
+    std::cout<<"ホップ数合計:"<<sumTimesForwarded<<std::endl;
+    std::cout<<"パケットロス合計"<<sumLostPackets<<std::endl;
+    std::cout<<"遅延合計"<<sumDelay.GetSeconds()*1000<<"ms"<<std::endl;
+    std::cout<<"送信パケット数合計"<<sumTxPackets<<std::endl;
+    std::cout<<"受信パケット数合計"<<sumRxPackets<<std::endl;
+    //std::cout<<"コントロールパケットポート番号"<<m_routingHelper->GetRoutingStats().GetCport()<<std::endl;
+    std::cout<<"送信オーバーヘッド合計"<<sumOverHead<<std::endl;
+    
+  }
+
 
 int main (int argc, char *argv[])
 {

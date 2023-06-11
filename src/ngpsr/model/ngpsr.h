@@ -43,6 +43,8 @@ namespace ngpsr {
 class RoutingProtocol : public Ipv4RoutingProtocol
 {
   DSA* dsa;
+  unsigned char m_dsaSignatureIP[128];
+  unsigned int m_dsaSignatureLengthIP;
 public://コンストラクタ
   static TypeId GetTypeId (void);
   static const uint32_t NGPSR_PORT;
@@ -84,6 +86,23 @@ public://コンストラクタ
   {
     return dsa;
   }
+  void SetDsaSignatureIP(const unsigned char* signature)
+{
+    memcpy(m_dsaSignatureIP, signature, 128);
+}
+const unsigned char* GetDsaSignatureIP() const
+{
+    return m_dsaSignatureIP;
+}
+
+void SetDsaSignatureLengthIP(unsigned int length)
+{
+    m_dsaSignatureLengthIP = length;
+}
+unsigned int GetDsaSignatureLengthIP() const
+{
+    return m_dsaSignatureLengthIP;
+}
 
 
   Ptr<Ipv4> m_ipv4;
@@ -151,8 +170,6 @@ private://データメンバ
   Ptr<LocationService> m_locationService;
 
   IpL4Protocol::DownTargetCallback m_downTarget;
-
-
 
 };
 }

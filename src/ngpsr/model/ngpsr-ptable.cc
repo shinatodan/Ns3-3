@@ -41,10 +41,7 @@ PositionTable::GetEntryUpdateTime (Ipv4Address id)
 void
 PositionTable::AddEntry (Ipv4Address id, Vector position, uint64_t nodeid)
 {
-        if(nodeid == 4){
-                std::cout << "不正なhelloデータです" << std::endl;//数字が合わなかったら隣接ノードテーブルを更新しない
-        }
-        else{
+        
 		std::map<Ipv4Address, Metrix >::iterator i = m_table.find (id);
 		if(i != m_table.end() || id.IsEqual (i->first))
 		{
@@ -59,7 +56,7 @@ PositionTable::AddEntry (Ipv4Address id, Vector position, uint64_t nodeid)
 		metrix.position=position;
 		metrix.time=Simulator::Now ();
 		m_table.insert (std::make_pair (id, metrix));
-        }
+        
 }
 		
 		
