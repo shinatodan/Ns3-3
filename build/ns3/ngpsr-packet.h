@@ -11,6 +11,10 @@
 #include "ns3/nstime.h"
 #include "ns3/vector.h"
 
+#include <openssl/dsa.h>
+#include <openssl/err.h>
+#include <openssl/sha.h>
+
 namespace ns3 {
 namespace ngpsr {
 
@@ -60,19 +64,23 @@ private:
 
 std::ostream & operator<< (std::ostream & os, TypeHeader const & h);
 
+
 class HelloHeader : public Header
 {
 public:
   /// c-tor
-  HelloHeader (uint64_t originPosx = 0, uint64_t originPosy = 0 , uint64_t originVelx = 0, uint64_t originVely = 0);
+  //shinato
+  HelloHeader (uint64_t originPosx = 0, uint64_t originPosy = 0, uint64_t node = 0, const unsigned char* signature = nullptr, unsigned int signatureLength = 0);
 
   ///\name Header serialization/deserialization
   //\{
   static TypeId GetTypeId ();
   TypeId GetInstanceTypeId () const;
   uint32_t GetSerializedSize () const;
-  void Serialize (Buffer::Iterator start) const;
-  uint32_t Deserialize (Buffer::Iterator start);
+  //shinato
+  void Serialize (Buffer::Iterator start) const override;
+  uint32_t Deserialize (Buffer::Iterator start) override;
+
   void Print (std::ostream &os) const;
   //\}
 
@@ -94,23 +102,27 @@ public:
   {
     return m_originPosy;
   }
-  //追加
-   void SetOriginVelx (uint64_t velx)
+  //shinato
+  void Setid (uint64_t node)
   {
-    m_originVelx = velx;
+    nodeid = node;
   }
-  uint64_t GetOriginVelx () const
-  {	
-    return m_originVelx;
-  }
-  void SetOriginVely (uint64_t vely)
+  uint64_t Getid () const
   {
-    m_originVely = vely;
+    return nodeid;
   }
-  uint64_t GetOriginVely () const
+  const unsigned char* GetSignature() const
   {
-    return m_originVely;
-  }//追加終了
+    return m_signature;
+  }
+  void SetSignatureLength (unsigned int signatureLength)
+  {
+    m_signatureLength = signatureLength;
+  }
+  unsigned int GetSignatureLength() const{
+    return m_signatureLength;
+  }
+
   //\}
 
 
@@ -118,8 +130,10 @@ public:
 private:
   uint64_t         m_originPosx;          ///< Originator Position x
   uint64_t         m_originPosy;          ///< Originator Position x
-  uint64_t         m_originVelx;          ///< Originator Position x
-  uint64_t         m_originVely;          ///< Originator Position x
+  //shinato
+  uint64_t nodeid;
+  unsigned char m_signature[128];
+  unsigned int m_signatureLength;
 };
 
 std::ostream & operator<< (std::ostream & os, HelloHeader const &);

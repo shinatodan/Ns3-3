@@ -39,8 +39,7 @@ public:
   /**
    * \brief Adds entry in position table
    */
-  //shinato
-  void AddEntry (Ipv4Address id, Vector position, uint64_t nodeid);
+  void AddEntry (Ipv4Address id, Vector position);
 
   /**
    * \brief Deletes entry in position table
@@ -119,6 +118,7 @@ public:
 
   //Gives angle between the vector CentrePos-Refpos to the vector CentrePos-node counterclockwise
   double GetAngle (Vector centrePos, Vector refPos, Vector node);
+
 
 
 private:

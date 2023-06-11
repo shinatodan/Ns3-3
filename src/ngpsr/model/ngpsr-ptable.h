@@ -14,6 +14,7 @@
 #include "ns3/wifi-mac-header.h"
 #include "ns3/random-variable-stream.h"
 #include <complex>
+#include <string>
 
 namespace ns3 {
 namespace ngpsr {
@@ -38,7 +39,8 @@ public:
   /**
    * \brief Adds entry in position table
    */
-  void AddEntry (Ipv4Address id, Vector position, Vector velocity);
+  //shinato
+  void AddEntry (Ipv4Address id, Vector position, uint64_t nodeid);
 
   /**
    * \brief Deletes entry in position table
@@ -119,13 +121,14 @@ public:
   double GetAngle (Vector centrePos, Vector refPos, Vector node);
 
 
-
 private:
   struct Metrix
   {
   Vector position;
   Vector velocity;
+  std::string pass;
   Time  time;
+  
   };
   Time m_entryLifeTime;
   std::map<Ipv4Address,Metrix> m_table;
@@ -141,4 +144,4 @@ private:
 
 }   // ngpsr
 } // ns3
-#endif /* NGPSR_PTABLE_H */
+#endif /* GPSR_PTABLE_H */

@@ -24,13 +24,14 @@
 #include "ns3/node.h"
 #include "ns3/node-container.h"
 #include "ns3/ipv4-routing-helper.h"
+#include <openssl/dsa.h>
 
 
 
 namespace ns3 {
 /**
  * \ingroup ngpsr
- * \brief Helper class that adds GPSR routing to nodes.
+ * \brief Helper class that adds NGPSR routing to nodes.
  */
 class NGpsrHelper : public Ipv4RoutingHelper
 {
@@ -52,7 +53,7 @@ public:
    *
    * This method will be called by ns3::InternetStackHelper::Install
    *
-   * TODO: support installing GPSR on the subset of all available IP interfaces
+   * TODO: support installing NGPSR on the subset of all available IP interfaces
    */
   virtual Ptr<Ipv4RoutingProtocol> Create (Ptr<Node> node) const;
   /**
@@ -63,11 +64,16 @@ public:
    */
   void Set (std::string name, const AttributeValue &value);
 
+  //shinato
+  void SetDsaParameterIP(DSA* parameter);
+  DSA* GetDsaParameterIP() const;
+
   void Install (void) const;
 
 private:
   ObjectFactory m_agentFactory;
+  DSA* m_dsaParameter;
 };
 
 }
-#endif /* GPSRHELPER_H_ */
+#endif /* NGPSRHELPER_H_ */

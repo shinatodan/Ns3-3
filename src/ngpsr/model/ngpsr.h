@@ -28,6 +28,10 @@
 #include <map>
 #include <complex>
 
+#include <openssl/dsa.h>
+#include <openssl/err.h>
+#include <openssl/sha.h>
+
 namespace ns3 {
 namespace ngpsr {
 /**
@@ -35,9 +39,11 @@ namespace ngpsr {
  *
  * \brief NGPSR routing protocol
  */
+
 class RoutingProtocol : public Ipv4RoutingProtocol
 {
-public:
+  DSA* dsa;
+public://コンストラクタ
   static TypeId GetTypeId (void);
   static const uint32_t NGPSR_PORT;
 
@@ -62,27 +68,39 @@ public:
   virtual void NotifyRemoveAddress (uint32_t interface, Ipv4InterfaceAddress address);
   virtual void SetIpv4 (Ptr<Ipv4> ipv4);
   virtual void RecvNGPSR (Ptr<Socket> socket);
-  virtual void UpdateRouteToNeighbor (Ipv4Address sender, Ipv4Address receiver, Vector Pos, Vector Vel);
+  //shinato
+  virtual void UpdateRouteToNeighbor (Ipv4Address sender, Ipv4Address receiver, Vector Pos, uint64_t nodeid);
   virtual void SendHello ();
   virtual bool IsMyOwnAddress (Ipv4Address src);
+  //shinato
+  virtual void handleErrors();
+  std::string ConvertToHex(const unsigned char* data, size_t length);
+  void SetDsaParameterIP(DSA* parameter)
+  {
+    dsa = parameter;
+  }
+
+  DSA* GetDsaParameterIP() const
+  {
+    return dsa;
+  }
+
 
   Ptr<Ipv4> m_ipv4;
-  /// Raw socket per each IP interface, map socket -> iface address (IP + mask)
+  /// 各インターフェースごとrawソケット, マップソケット -> iface address (IP + mask)
   std::map< Ptr<Socket>, Ipv4InterfaceAddress > m_socketAddresses;
-  /// Loopback device used to defer RREQ until packet will be fully formed
+  ///  パケットが完全に形成されるまで RREQ を延期するために使用されるループバック デバイス
   Ptr<NetDevice> m_lo;
 
   Ptr<LocationService> GetLS ();
   void SetLS (Ptr<LocationService> locationService);
 
-  /// Broadcast ID
+  /// ブロードキャストID
   uint32_t m_requestId;
-  /// Request sequence number
+  /// シーケンス番号のリクエスト
   uint32_t m_seqNo;
 
-
-
-  /// Number of RREQs used for RREQ rate control
+  /// RREQ レート制御に使用される RREQ の数
   uint16_t m_rreqCount;
   Time HelloInterval;
 
@@ -95,34 +113,33 @@ public:
   }
 
 
-private:
-  /// Start protocol operation
+private://データメンバ
+  ///　プロトコル操作を開始
   void Start ();
-  /// Queue packet and send route request
+  ///　パケットをキューに入れ、ルート リクエストを送信します
   void DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & header, UnicastForwardCallback ucb, ErrorCallback ecb);
-  /// If route exists and valid, forward packet.
+  ///　ルートが存在し有効な場合、パケットを転送します。
   void HelloTimerExpire ();
 
-  /// Queue packet and send route request
+  ///　パケットをキューに入れ、ルート リクエストを送信します
   Ptr<Ipv4Route> LoopbackRoute (const Ipv4Header & header, Ptr<NetDevice> oif);
 
-  /// If route exists and valid, forward packet.
+  ///　ルートが存在し有効な場合、パケットを転送します
   bool Forwarding (Ptr<const Packet> p, const Ipv4Header & header, UnicastForwardCallback ucb, ErrorCallback ecb);
 
-  /// Find socket with local interface address iface
+  ///　ローカル インターフェイス アドレス iface を持つソケットを見つける
   Ptr<Socket> FindSocketWithInterfaceAddress (Ipv4InterfaceAddress iface) const;
 
-  //Check packet from deffered route output queue and send if position is already available
-//returns true if the IP should be erased from the list (was sent/droped)
+  //据え置きルート出力キューからのパケットをチェックし、位置がすでに使用可能な場合は送信します
   bool SendPacketFromQueue (Ipv4Address dst);
 
-  //Calls SendPacketFromQueue and re-schedules
+  //SendPacketFromQueueを呼び出して再スケジュール
   void CheckQueue ();
 
   void RecoveryMode(Ipv4Address dst, Ptr<Packet> p, UnicastForwardCallback ucb, Ipv4Header header);
   
-  uint32_t MaxQueueLen;                  ///< The maximum number of packets that we allow a routing protocol to buffer.
-  Time MaxQueueTime;                     ///< The maximum period of time that a routing protocol is allowed to buffer a packet for.
+  uint32_t MaxQueueLen;                  ///<ルーティング プロトコルがバッファできるパケットの最大数
+  Time MaxQueueTime;                     ///<ルーティング プロトコルがパケットをバッファできる最大時間
   RequestQueue m_queue;
 
   Timer HelloIntervalTimer;

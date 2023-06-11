@@ -28,10 +28,6 @@
 #include <map>
 #include <complex>
 
-#include <openssl/dsa.h>
-#include <openssl/err.h>
-#include <openssl/sha.h>
-
 namespace ns3 {
 namespace gpsr {
 /**
@@ -39,11 +35,9 @@ namespace gpsr {
  *
  * \brief GPSR routing protocol
  */
-
 class RoutingProtocol : public Ipv4RoutingProtocol
 {
-  DSA* dsa;
-public://コンストラクタ
+public:
   static TypeId GetTypeId (void);
   static const uint32_t GPSR_PORT;
 
@@ -68,23 +62,9 @@ public://コンストラクタ
   virtual void NotifyRemoveAddress (uint32_t interface, Ipv4InterfaceAddress address);
   virtual void SetIpv4 (Ptr<Ipv4> ipv4);
   virtual void RecvGPSR (Ptr<Socket> socket);
-  //shinato
-  virtual void UpdateRouteToNeighbor (Ipv4Address sender, Ipv4Address receiver, Vector Pos, uint64_t nodeid);
+  virtual void UpdateRouteToNeighbor (Ipv4Address sender, Ipv4Address receiver, Vector Pos);
   virtual void SendHello ();
   virtual bool IsMyOwnAddress (Ipv4Address src);
-  //shinato
-  virtual void handleErrors();
-  std::string ConvertToHex(const unsigned char* data, size_t length);
-  void SetDsaParameter(DSA* parameter)
-  {
-    dsa = parameter;
-  }
-
-  DSA* GetDsaParameter() const
-  {
-    return dsa;
-  }
-
 
   Ptr<Ipv4> m_ipv4;
   /// 各インターフェースごとrawソケット, マップソケット -> iface address (IP + mask)
@@ -113,7 +93,7 @@ public://コンストラクタ
   }
 
 
-private://データメンバ
+private:
   ///　プロトコル操作を開始
   void Start ();
   ///　パケットをキューに入れ、ルート リクエストを送信します
@@ -137,13 +117,10 @@ private://データメンバ
   void CheckQueue ();
 
   void RecoveryMode(Ipv4Address dst, Ptr<Packet> p, UnicastForwardCallback ucb, Ipv4Header header);
-
-  void GenerateKeys();
-
+  
   //shinato
-  
-  std::string message = "こんにちは";
-  
+  uint32_t nodeId = 0;
+  std::string Addpass(std::string &s, uint32_t Id);
   
   uint32_t MaxQueueLen;                  ///<ルーティング プロトコルがバッファできるパケットの最大数
   Time MaxQueueTime;                     ///<ルーティング プロトコルがパケットをバッファできる最大時間

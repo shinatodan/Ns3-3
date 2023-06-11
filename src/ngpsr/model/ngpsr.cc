@@ -19,6 +19,14 @@
 #include <limits>
 #include <ns3/udp-header.h>
 #include "ns3/seq-ts-header.h"
+#include <string>
+#include <iomanip>
+
+#include <openssl/dsa.h>
+#include <openssl/err.h>
+#include <openssl/sha.h>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
 
 
 #define NGPSR_LS_GOD 0
@@ -31,10 +39,10 @@ namespace ns3 {
 namespace ngpsr {
 
 
-//先定义了DeferedRouteOutputTag的类，包含一个m_isCallFromL3的标志，初始化为0
+//DeferedRouteOutputTagクラスが最初に定義され、0に初期化されたm_isCallFromL3フラグを含む。
 struct DeferredRouteOutputTag : public Tag
 {
-        /// Positive if output device is fixed in RouteOutput
+        ///RouteOutputで出力デバイスが固定されていたらOK
         uint32_t m_isCallFromL3;
 
         DeferredRouteOutputTag () : Tag (),
@@ -46,7 +54,7 @@ struct DeferredRouteOutputTag : public Tag
 // TODO read ns3 api
         static TypeId GetTypeId ()
         {
-                static TypeId tid = TypeId ("ns3::ngpsr::DeferredRouteOutputTag").SetParent<Tag> (); //设置parent的tid,获取<Tag>是模版
+                static TypeId tid = TypeId ("ns3::ngpsr::DeferredRouteOutputTag").SetParent<Tag> (); //親のtidを設定し、<Tag>を取得するのはテンプレート
                 return tid;
         }
 
@@ -78,22 +86,20 @@ struct DeferredRouteOutputTag : public Tag
 
 Ptr<UniformRandomVariable> x = CreateObject<UniformRandomVariable> ();
 
-/********** Miscellaneous constants **********/
+/********** その他定数　**********/
 
-/// Maximum allowed jitter.
+/// 最大許容ジッター
 #define NGPSR_MAXJITTER          (HelloInterval.GetSeconds () / 2)
-/// Random number between [(-NGPSR_MAXJITTER)-NGPSR_MAXJITTER] used to jitter HELLO packet transmission.
+/// [(-NGPSR_MAXJITTER)-NGPSR_MAXJITTER] の間の乱数は、HELLO パケット送信のジッターに使用される
 #define JITTER (Seconds (x->GetValue (-NGPSR_MAXJITTER, NGPSR_MAXJITTER)))
-#define FIRST_JITTER (Seconds (x->GetValue (0, NGPSR_MAXJITTER))) //first Hello can not be in the past, used only on SetIpv4
+#define FIRST_JITTER (Seconds (x->GetValue (0, NGPSR_MAXJITTER))) //最初のHelloは過去のものではなく,SetIpv4でのみ使用
 
 
 
 NS_OBJECT_ENSURE_REGISTERED (RoutingProtocol);
-
-/// UDP Port for NGPSR control traffic, not defined by IANA yet
+/// IANAではまだ定義されていない、NGPSR制御トラフィックのUDPポート
 const uint32_t RoutingProtocol::NGPSR_PORT = 666;
-
-//构造函数，初始化；
+//初期化
 RoutingProtocol::RoutingProtocol ()
         : HelloInterval (Seconds (1.0)),
         MaxQueueLen (64),
@@ -106,7 +112,7 @@ RoutingProtocol::RoutingProtocol ()
 }
 
 
-//增加TypeId作为唯一的interface接口，可以不适用对象来访问其属性值,或者调用trace
+//オブジェクトを適用せずにそのプロパティ値にアクセスできるユニークなインターフェイスとしてTypeIdを追加、またはコールトレース
 TypeId
 RoutingProtocol::GetTypeId (void)
 {
@@ -152,7 +158,24 @@ RoutingProtocol::SetLS (Ptr<LocationService> locationService)
         m_locationService = locationService;
 }
 
-//节点接受到了一个包，需要将包向前传
+void RoutingProtocol::handleErrors()//openSSlのエラー処理
+{
+  ERR_print_errors_fp(stderr);
+  abort();
+}
+//バイナリデータを16進数文字列に変換する関数
+std::string 
+RoutingProtocol::ConvertToHex(const unsigned char* data, size_t length){
+        std::stringstream ss;
+        ss << std::hex << std::setfill('0');
+        for (size_t i = 0; i < length; ++i) {
+        ss << std::setw(2) << static_cast<int>(data[i]);
+        }
+        return ss.str();
+}
+
+
+//ノードがパケットを受信し、そのパケットを転送する必要がある場合（自分が宛先ノードでない場合）
 bool RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header, Ptr<const NetDevice> idev,
                                   UnicastForwardCallback ucb, MulticastForwardCallback mcb,
                                   LocalDeliverCallback lcb, ErrorCallback ecb)
@@ -167,44 +190,30 @@ bool RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header,
         }
         NS_ASSERT (m_ipv4 != 0);
         NS_ASSERT (p != 0);
-        // Check if input device supports IP
+        //入力デバイスがIPに対応しているかどうか確認
         NS_ASSERT (m_ipv4->GetInterfaceForDevice (idev) >= 0);
         int32_t iif = m_ipv4->GetInterfaceForDevice (idev);
         Ipv4Address dst = header.GetDestination ();
         Ipv4Address origin = header.GetSource ();
 
-        DeferredRouteOutputTag tag; //FIXME since I have to check if it's in origin for it to work it means I'm not taking some tag out...
-        //如果有推迟的tag标志同时自己是发送源就就推迟
+        DeferredRouteOutputTag tag; //FIXMEは、オリジンに入っているかどうかを確認しないと動作しないので、タグを取り出していないことになりますが...。
+        //遅延タグフラグがあり、自分が送信元の場合は遅延
 
         if (p->PeekPacketTag (tag) && IsMyOwnAddress (origin))
         {
-                Ptr<Packet> packet = p->Copy (); //FIXME ja estou a abusar de tirar tags
+                Ptr<Packet> packet = p->Copy (); //FIXME すでにタグを取り過ぎている
                 packet->RemovePacketTag(tag);
                 DeferredRouteOutput (packet, header, ucb, ecb);
                 return true;
         }
-
-        // Ptr<Packet> packet = p->Copy ();
-        // TypeHeader tHeader (NGPSRTYPE_POS);
-        // //去掉packet的包头
-        // packet->RemoveHeader (tHeader);
-        // //这个部分没有写，当作都valid
-        // if (!tHeader.IsValid ())
-        // {
-        //         NS_LOG_DEBUG ("error received " << packet->GetUid () << " with unknown type received: " << tHeader.Get () << ". Ignored");
-        //         NS_LOG_DEBUG ("Routing input ReceivePacket error destination"<<dst<<"source"<<origin);
-        //         return false;
-        // }
-
-        //如果是目的节点的包，那么就拆包
         if (m_ipv4->IsDestinationAddress (dst, iif))
         {
 
                 Ptr<Packet> packet = p->Copy ();
                 TypeHeader tHeader (NGPSRTYPE_POS);
-                //去掉packet的包头
+                //パケットからパケットヘッダを取り除く
                 packet->RemoveHeader (tHeader);
-                //这个部分没有写，当作都valid
+                //この部分は書かれていないので、オールバリッドとして扱われる
                 if (!tHeader.IsValid ())
                 {
                         NS_LOG_DEBUG ("NGPSR message " << packet->GetUid () << " with unknown type received: " << tHeader.Get () << ". Ignored");
@@ -212,40 +221,31 @@ bool RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header,
                         return false;
                 }
                 NS_LOG_DEBUG ("Received packet");
-                //如果是POS的包，就把POS的包头再去掉，所以不需要了解pos的信息了，直接去掉）
+                //POSパッケージであれば、POSパッケージのヘッダを再度削除するので、POSについて知る必要はなく、ただ削除するだけでよい
                 if (tHeader.Get () == NGPSRTYPE_POS)
                 {
                         PositionHeader phdr;
                         packet->RemoveHeader (phdr);
                 }
 
-                //判断是广播接受还是单播接受到的包
+                //パケットがブロードキャストで受け入れられたか、ユニキャストで受け入れられたかを判断する
                 if (dst != m_ipv4->GetAddress (1, 0).GetBroadcast ())
                 {
-                        //通过unicast传到的
+                        //ユニキャストで渡される
                         NS_LOG_LOGIC ("Unicast local delivery to " << dst);
                 }
                 else
                 {
-                        //通过broadcast传到dst的
+                        //ブロードキャストでDSTに渡される
                         NS_LOG_LOGIC ("Broadcast local delivery to " << dst);
                 }
 
-                //LocalDeliverCallback对象初始化，iff是mac地址.
-                //是目的节点，给自己
+                //LocalDeliverCallbackオブジェクトが初期化され、iffがmacアドレスになる
+                //自分が目的ノード
                 lcb (packet, header, iif);
                 return true;
         }
-        // //如果收到是hello，就不往前传了？
-        // if (dst == m_ipv4->GetAddress (1, 0).GetBroadcast ())
-        // {
-        //   NS_LOG_LOGIC ("Receive broadcast hello " << dst);
-        //   return true;
-        // }
         Ptr<Packet> packet = p->Copy ();
-        //如果不是目的节点继续向前传递
-        // if(packet->GetSize()!=86) //防止回去的不丢
-        // {
         if(packet->GetSize()!=90)
         {
                 UdpHeader udpHeader;
@@ -295,7 +295,7 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p, const Ipv4Header &header,
         {
                 dstPos = m_locationService->GetPosition (dst);
         }
-        //if received hello boardcast  TODO 还需要验证,应该如何处理
+        //if received hello boardcast  TODO 検証が必要なことに変わりはないが、どのように対処すればよいのか
         else
         {
                 NS_LOG_DEBUG("send broadcast hello from"<<header.GetSource()<<"TODO fix it ");
@@ -320,12 +320,6 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p, const Ipv4Header &header,
                         return Ptr<Ipv4Route> ();
                 }
                 return route;
-                // DeferredRouteOutputTag tag;
-                // if (!p->PeekPacketTag (tag))
-                // {
-                //         p->AddPacketTag (tag);
-                // }
-                // return LoopbackRoute (header, oif);
         }
 
 
@@ -371,7 +365,7 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p, const Ipv4Header &header,
                 p->AddHeader (posHeader);
                 p->AddHeader (tHeader);
 
-                NS_LOG_DEBUG ("Destination: " << dst<<"Position"<<dstPos); //需要考虑boardcast的地址，位置再1.0.0,source 设置是102.102.102.102
+                NS_LOG_DEBUG ("Destination: " << dst<<"Position"<<dstPos); //ボードキャストのアドレスを考えると、ロケーションは1.0.0、ソースは102.102.102.102に設定
 
                 route->SetDestination (dst);
                 if (header.GetSource () == Ipv4Address ("102.102.102.102"))
@@ -397,14 +391,6 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p, const Ipv4Header &header,
         }
         else
         {
-                // //packet add header
-                // uint32_t updated = (uint32_t) m_locationService->GetEntryUpdateTime (dst).GetSeconds ();
-                //
-                // TypeHeader tHeader (NGPSRTYPE_POS);
-                // PositionHeader posHeader (dstPos.x, dstPos.y,  updated, (uint64_t) 0, (uint64_t) 0, (uint8_t) 0, myPos.x, myPos.y);
-                // p->AddHeader (posHeader);
-                // p->AddHeader (tHeader);
-
                 DeferredRouteOutputTag tag;
                 if (!p->PeekPacketTag (tag))
                 {
@@ -416,7 +402,7 @@ RoutingProtocol::RouteOutput (Ptr<Packet> p, const Ipv4Header &header,
 
 
 
-//推迟路由输出
+//遅延ルーティング出力
 void
 RoutingProtocol::DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & header,
                                       UnicastForwardCallback ucb, ErrorCallback ecb)
@@ -427,10 +413,10 @@ RoutingProtocol::DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & he
         if (m_queue.GetSize () == 0)
         {
                 CheckQueueTimer.Cancel ();
-                //重新开始记时调度
+                //計時スケジュールの再設定
                 CheckQueueTimer.Schedule (Time ("500ms"));
         }
-        //将发送的包入队
+        //送信されたパケットのキューイング
         QueueEntry newEntry (p, header, ucb, ecb);
         bool result = m_queue.Enqueue (newEntry);
 
@@ -445,7 +431,7 @@ RoutingProtocol::DeferredRouteOutput (Ptr<const Packet> p, const Ipv4Header & he
 
 }
 
-//检查排队情况
+//キューの確認
 void
 RoutingProtocol::CheckQueue ()
 {
@@ -456,28 +442,28 @@ RoutingProtocol::CheckQueue ()
 
         for (std::list<Ipv4Address>::iterator i = m_queuedAddresses.begin (); i != m_queuedAddresses.end (); ++i)
         {
-                //如果该地址发送了,那么就把地址放到需要删除的列表中，之后一起删除
-                if (SendPacketFromQueue (*i)) //判断的过程同时调用发送packet函数
+                //アドレスが送信されている場合は、削除するアドレスのリストに入れて、まとめて削除
+                if (SendPacketFromQueue (*i)) //これを判断するためには、パケット送信機能の呼び出しが必要
                 {
-                        //Insert in a list to remove later
+                        //リストに挿入して後で削除
                         toRemove.insert (toRemove.begin (), *i);
                 }
         }
 
-        //remove all that are on the list
+        //リストに載っているものをすべて削除
         for (std::list<Ipv4Address>::iterator i = toRemove.begin (); i != toRemove.end (); ++i)
         {
                 m_queuedAddresses.remove (*i);
         }
 
-        if (!m_queuedAddresses.empty ()) //Only need to schedule if the queue is not empty
+        if (!m_queuedAddresses.empty ()) //キューが空になっていない場合にのみスケジュールする必要がある
         {
                 CheckQueueTimer.Schedule (Time ("500ms"));
         }
 }
 
 
-//从queue中发送，前面是直接发送？
+//キューからの送信の前にダイレクトに送信する？
 bool
 RoutingProtocol::SendPacketFromQueue (Ipv4Address dst)
 {
@@ -485,15 +471,15 @@ RoutingProtocol::SendPacketFromQueue (Ipv4Address dst)
         bool recovery = false;
         QueueEntry queueEntry;
         NS_LOG_DEBUG ("SendPacketFromQueue ");
-        //先通过locationService找到目的节点的位置
+        //locationServiceを介して、デスティネーションノードの位置を見つける
         if (m_locationService->IsInSearch (dst))
         {
                 return false;
         }
 
-        if (!m_locationService->HasPosition (dst)) // Location-service stoped looking for the dst
+        if (!m_locationService->HasPosition (dst)) // Location-serviceはｄｓｔの検索を停止
         {
-                //queue删除发送目的节点的位置的request，因为没有找到目的节点的位置
+                //キューは、デスティネーションノードのロケーションが見つからなかったため、デスティネーションノードのロケーションを送信するリクエストを削除します
                 m_queue.DropPacketWithDst (dst);
                 NS_LOG_LOGIC ("Location Service did not find dst. Drop packet to " << dst);
                 return true;
@@ -506,14 +492,14 @@ RoutingProtocol::SendPacketFromQueue (Ipv4Address dst)
         myVec=MM->GetVelocity();
         Ipv4Address nextHop;
 
-        //如果目的节点就是邻居节点，那么直接传给目的节点
+        //宛先ノードが近隣ノードの場合は、宛先ノードに直接渡す
         if(m_neighbors.isNeighbour (dst))
         {
                 nextHop = dst;
         }
-        //否则，就寻找距离目的最近的邻居节点
+        //それ以外の場合dstに最も近い近隣ノードを見つける
         else{
-                //找到目标节点坐标的位置
+                //宛先ノードの座標の位置を見つける
                 Vector dstPos = m_locationService->GetPosition (dst);
 
                 //nextHop = m_neighbors.BestNeighbor (dstPos, myPos,myVec);
@@ -525,7 +511,7 @@ RoutingProtocol::SendPacketFromQueue (Ipv4Address dst)
                 }
 
         }
-        //开启recovery mode
+        //recovery modeを開く
         if(recovery)
         {
 
@@ -533,8 +519,8 @@ RoutingProtocol::SendPacketFromQueue (Ipv4Address dst)
                 Vector previousHop;
                 uint32_t updated;
 
-                //将目的节点的发送request出队，修改发送包的信息，更新包里面的本节点的地理位置信息（之前如果不是recovery）
-                //因为调用recovery mode需要记录当前开始recovery mode的节点位置（recvPos），因而需要展开包给与当前节点的位置信息
+                //宛先ノードからの送信要求をキューに入れ、送信パケットの情報を修正し、パケット内の本ノードのジオロケーション情報を更新する（未回収の場合）
+                //リカバリーモードの呼び出しには、現在リカバリーモードを開始しているノードの位置情報（recvPos）が必要なため、パッケージを拡張して現在のノードの位置情報を与える必要があります
 
                 while(m_queue.Dequeue (dst, queueEntry))
                 {
@@ -560,7 +546,7 @@ RoutingProtocol::SendPacketFromQueue (Ipv4Address dst)
                         }
 
                         PositionHeader posHeader (Position.x, Position.y,  updated, myPos.x, myPos.y, (uint8_t) 1, Position.x, Position.y);
-                        p->AddHeader (posHeader);         //enters in recovery with last edge from Dst
+                        p->AddHeader (posHeader);         //Dstからの最後のエッジでrecovery modeに入る
                         p->AddHeader (tHeader);
 
                         RecoveryMode(dst, p, ucb, header);
@@ -573,7 +559,7 @@ RoutingProtocol::SendPacketFromQueue (Ipv4Address dst)
         route->SetDestination (dst);
         route->SetGateway (nextHop);
 
-        // FIXME: Does not work for multiple interfaces
+        // FIXME: 複数のインターフェースに対応していない
         route->SetOutputDevice (m_ipv4->GetNetDevice (1));
 
         while (m_queue.Dequeue (dst, queueEntry))
@@ -617,7 +603,8 @@ RoutingProtocol::RecoveryMode(Ipv4Address dst, Ptr<Packet> p, UnicastForwardCall
         myPos.y = positionY;
 
 
-        //因为recovery需要记录中途节点的位置（lastPos），需要展开包，记录下当前节点的位置信息
+
+        //リカバリーには途中のノードの位置情報（lastPos）が必要なため、パッケージを拡張して現在のノードの位置情報を記録する必要がある
         TypeHeader tHeader (NGPSRTYPE_POS);
         p->RemoveHeader (tHeader);
         if (!tHeader.IsValid ())
@@ -644,7 +631,8 @@ RoutingProtocol::RecoveryMode(Ipv4Address dst, Ptr<Packet> p, UnicastForwardCall
 
 
 
-        Ipv4Address nextHop = m_neighbors.BestAngle (previousHop, myPos); // best angle 来寻找
+        Ipv4Address nextHop = m_neighbors.BestAngle (previousHop, myPos); //ベストアングルを探す
+
         if (nextHop == Ipv4Address::GetZero ())
         {
                 return;
@@ -668,14 +656,14 @@ RoutingProtocol::NotifyInterfaceUp (uint32_t interface)
 {
         NS_LOG_FUNCTION (this << m_ipv4->GetAddress (interface, 0).GetLocal ());
         Ptr<Ipv4L3Protocol> l3 = m_ipv4->GetObject<Ipv4L3Protocol> ();
-        //ngpsr只能每个接口一个ip地址
+        //gpsrは1つのインターフェイスに1つのIPアドレスしか持てません
         if (l3->GetNAddresses (interface) > 1)
         {
                 NS_LOG_WARN ("NGPSR does not work with more then one address per each interface.");
         }
 
         Ipv4InterfaceAddress iface = l3->GetAddress (interface, 0);
-        //如果已经开启就返回
+        //すでにオンになっている場合は戻る
         if (iface.GetLocal () == Ipv4Address ("127.0.0.1"))
         {
                 return;
@@ -693,7 +681,7 @@ RoutingProtocol::NotifyInterfaceUp (uint32_t interface)
         m_socketAddresses.insert (std::make_pair (socket, iface));
 
 
-        // Allow neighbor manager use this interface for layer 2 feedback if possible
+        //可能であれば、ネイバーマネージャーがレイヤー2のフィードバックにこのインターフェイスを使用できるようにする
         Ptr<NetDevice> dev = m_ipv4->GetNetDevice (m_ipv4->GetInterfaceForAddress (iface.GetLocal ()));
         Ptr<WifiNetDevice> wifi = dev->GetObject<WifiNetDevice> ();
         if (wifi == 0)
@@ -710,19 +698,13 @@ RoutingProtocol::NotifyInterfaceUp (uint32_t interface)
 
 }
 
-//接受到socket的包
+//socketのパケットを受信する
 void
 RoutingProtocol::RecvNGPSR (Ptr<Socket> socket)
 {
         NS_LOG_FUNCTION (this << socket);
         Address sourceAddress;
         Ptr<Packet> packet = socket->RecvFrom (sourceAddress);
-        //RemoveHeader
-        // TypeHeader tHeader1 (NGPSRTYPE_HELLO);
-        // packet->RemoveHeader (tHeader1);
-        // PositionHeader pHeader ;
-        // packet->RemoveHeader (pHeader);
-        //packet->RemoveAtStart(54);
         NS_LOG_DEBUG("received hello packet"<<packet->GetSize());
 
         TypeHeader tHeader (NGPSRTYPE_HELLO);
@@ -737,36 +719,61 @@ RoutingProtocol::RecvNGPSR (Ptr<Socket> socket)
         HelloHeader hdr;
         packet->RemoveHeader (hdr);
         Vector Position;
-        Vector Velocity;
         Position.x = hdr.GetOriginPosx ();
         Position.y = hdr.GetOriginPosy ();
-        Velocity.x = hdr.GetOriginVelx ();
-        Velocity.y = hdr.GetOriginVely ();
         InetSocketAddress inetSourceAddr = InetSocketAddress::ConvertFrom (sourceAddress);
         Ipv4Address sender = inetSourceAddr.GetIpv4 ();
         Ipv4Address receiver = m_socketAddresses[socket].GetLocal ();
         NS_LOG_DEBUG("update position"<<Position.x<<Position.y );
-        NS_LOG_DEBUG("update velocity"<<Velocity.x<<","<<Velocity.y );
-        //更新neighbor的信息
-        UpdateRouteToNeighbor (sender, receiver, Position, Velocity);
+
+        //shinato
+        uint64_t nodeId = hdr.Getid(); //数字受け取り
+        std::string nodeid = std::to_string(nodeId);//ノードIDを文字列に変換
+        //IDのハッシュ値計算
+        unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
+        SHA256(reinterpret_cast<const unsigned char*>(nodeid.c_str()), nodeid.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
+
+        std::string signatureText = ConvertToHex(hdr.GetSignature(), hdr.GetSignatureLength());
+        std::cout << "送信後署名: " << signatureText << std::endl;
+        std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
+        std::cout << "送信後ハッシュ値: " << hashText << std::endl;
+        std::cout << "送信後署名長さ：" << hdr.GetSignatureLength() << std::endl;
+        std::cout << "送信後ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
+        std::cout << "送信後鍵：" << GetDsaParameterIP() << std::endl;
+
+
+
+        // DSA署名検証
+        if (DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), GetDsaParameterIP()) != 1)//検証成功で１を返す。
+        {
+                std::cerr << "DSA signature verification failed" << std::endl;
+                //handleErrors();
+        }
+        else if(DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), GetDsaParameterIP()) == 1)
+        {
+                std::cout << "DSA signature verification succeeded" << std::endl;
+                UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
+        }
+        //UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
+
 
 }
 
-
+//shinato
 void
-RoutingProtocol::UpdateRouteToNeighbor (Ipv4Address sender, Ipv4Address receiver, Vector Pos, Vector Vel)
+RoutingProtocol::UpdateRouteToNeighbor (Ipv4Address sender, Ipv4Address receiver, Vector Pos, uint64_t nodeid)
 {
-        m_neighbors.AddEntry (sender, Pos, Vel);
+		m_neighbors.AddEntry (sender, Pos, nodeid);
 }
 
 
-//关闭interface的socket
+//interfaceのsocketを閉じる
 void
 RoutingProtocol::NotifyInterfaceDown (uint32_t interface)
 {
         NS_LOG_FUNCTION (this << m_ipv4->GetAddress (interface, 0).GetLocal ());
 
-        // Disable layer 2 link state monitoring (if possible)
+        //レイヤ2のリンク状態監視を無効にする（可能な場合）
         Ptr<Ipv4L3Protocol> l3 = m_ipv4->GetObject<Ipv4L3Protocol> ();
         Ptr<NetDevice> dev = l3->GetNetDevice (interface);
         Ptr<WifiNetDevice> wifi = dev->GetObject<WifiNetDevice> ();
@@ -780,7 +787,7 @@ RoutingProtocol::NotifyInterfaceDown (uint32_t interface)
                 }
         }
 
-        // Close socket
+        //socketを閉じる
         Ptr<Socket> socket = FindSocketWithInterfaceAddress (m_ipv4->GetAddress (interface, 0));
         NS_ASSERT (socket);
         socket->Close ();
@@ -795,7 +802,7 @@ RoutingProtocol::NotifyInterfaceDown (uint32_t interface)
 }
 
 
-//根据interface地址找到socket
+//interfaceのアドレスを元にsocketを探す
 Ptr<Socket>
 RoutingProtocol::FindSocketWithInterfaceAddress (Ipv4InterfaceAddress addr ) const
 {
@@ -815,7 +822,7 @@ RoutingProtocol::FindSocketWithInterfaceAddress (Ipv4InterfaceAddress addr ) con
 }
 
 
-//增加地址
+//アドレス追加
 void RoutingProtocol::NotifyAddAddress (uint32_t interface, Ipv4InterfaceAddress address)
 {
         NS_LOG_FUNCTION (this << " interface " << interface << " address " << address);
@@ -853,7 +860,7 @@ void RoutingProtocol::NotifyAddAddress (uint32_t interface, Ipv4InterfaceAddress
                 NS_LOG_LOGIC ("NGPSR does not work with more then one address per each interface. Ignore added address");
         }
 }
-//删除出地址
+//アドレスの削除
 void
 RoutingProtocol::NotifyRemoveAddress (uint32_t i, Ipv4InterfaceAddress address)
 {
@@ -872,12 +879,12 @@ RoutingProtocol::NotifyRemoveAddress (uint32_t i, Ipv4InterfaceAddress address)
                                                                    UdpSocketFactory::GetTypeId ());
                         NS_ASSERT (socket != 0);
                         socket->SetRecvCallback (MakeCallback (&RoutingProtocol::RecvNGPSR, this));
-                        // Bind to any IP address so that broadcasts can be received
+                        //任意のIPアドレスにバインドし、ブロードキャストを受信可能にする
                         socket->Bind (InetSocketAddress (Ipv4Address::GetAny (), NGPSR_PORT));
                         socket->SetAllowBroadcast (true);
                         m_socketAddresses.insert (std::make_pair (socket, iface));
 
-                        // Add local broadcast record to the routing table
+                        //ルーティングテーブルにローカルブロードキャストレコードを追加
                         Ptr<NetDevice> dev = m_ipv4->GetNetDevice (m_ipv4->GetInterfaceForAddress (iface.GetLocal ()));
 
                 }
@@ -903,11 +910,11 @@ RoutingProtocol::SetIpv4 (Ptr<Ipv4> ipv4)
 
         m_ipv4 = ipv4;
 
-        //当HelloIntercalTimer到时间了 就在FIRST_JITTER时间后调用HelloTimerExpire
+        //HelloIntercalTimerが立ち上がったら、FIRST_JITTER時間後にHelloTimerExpireを呼び出す。
         HelloIntervalTimer.SetFunction (&RoutingProtocol::HelloTimerExpire, this);
         HelloIntervalTimer.Schedule (FIRST_JITTER);
 
-        //Schedule only when it has packets on queue
+        //キューにパケットがあるときだけスケジュールする
         CheckQueueTimer.SetFunction (&RoutingProtocol::CheckQueue, this);
 
         Simulator::ScheduleNow (&RoutingProtocol::Start, this);
@@ -918,63 +925,78 @@ RoutingProtocol::HelloTimerExpire ()
 {
         SendHello ();
         HelloIntervalTimer.Cancel ();
-        //新建一个时间延时为HelloInterval + JITTER的Timer
+        //HelloInterval + JITTERの遅延時間を持つ新しいタイマーを作成
         HelloIntervalTimer.Schedule (HelloInterval + JITTER);
 }
 
-//Hello包的发送
+//Hello Packetsの送信
 void
 RoutingProtocol::SendHello ()
 {
         NS_LOG_FUNCTION (this);
         double positionX;
         double positionY;
-        double velocityX;
-        double velocityY;
-
+		
         Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
 
         positionX = MM->GetPosition ().x;
         positionY = MM->GetPosition ().y;
-        velocityX = MM->GetVelocity ().x;
-        velocityY = MM->GetVelocity ().y;
-        NS_LOG_DEBUG("send velocity"<<velocityX<<","<<velocityY  );
-  
-/*        
-        if(velocityY<0)
-        velocityY=velocityY*(-1);
-        if(velocityX<0){
-        velocityX=velocityX*(-1);
-		NS_LOG_DEBUG("send update velocity"<<velocityX<<","<<velocityY  );
-		}
-*/        
+
+        //shinato
+        //helloパケットに追加する数字
+        uint64_t nodeId = m_ipv4->GetObject<Node> ()->GetId ();//ノードID取得
+        std::string nodeid = std::to_string(nodeId);//ノードIDを文字列に変換
+        //IDのハッシュ値計算
+        unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
+        SHA256(reinterpret_cast<const unsigned char*>(nodeid.c_str()), nodeid.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
         
-
-        for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j != m_socketAddresses.end (); ++j)
+        //DSA署名生成
+        unsigned char signature[DSA_size(GetDsaParameterIP())];
+        unsigned int signatureLength;
+        if (DSA_sign(0, digest, SHA256_DIGEST_LENGTH, signature, &signatureLength, GetDsaParameterIP()) != 1)
         {
-                Ptr<Socket> socket = j->first;
-                Ipv4InterfaceAddress iface = j->second;
-                HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY),((uint64_t) velocityX),((uint64_t) velocityY));
-
-                Ptr<Packet> packet = Create<Packet> ();
-                packet->AddHeader (helloHeader);
-                TypeHeader tHeader (NGPSRTYPE_HELLO);
-                packet->AddHeader (tHeader);
-                // Send to all-hosts broadcast if on /32 addr, subnet-directed otherwise
-                Ipv4Address destination;
-                if (iface.GetMask () == Ipv4Mask::GetOnes ())
-                {
-                        destination = Ipv4Address ("255.255.255.255");
-                        NS_LOG_DEBUG("Send hello to destination"<<destination );
-                }
-                else
-                {
-                        destination = iface.GetBroadcast ();
-                        NS_LOG_DEBUG("Send hello to destination"<<destination );
-                }
-                socket->SendTo (packet, 0, InetSocketAddress (destination, NGPSR_PORT));
-
+                std::cerr << "Failed to generate DSA signature" << std::endl;
+                handleErrors();
         }
+        std::string signatureText = ConvertToHex(signature, signatureLength);
+        std::cout << "送信前署名: " << signatureText << std::endl;
+        std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
+        std::cout << "送信前ハッシュ値: " << hashText << std::endl;
+        std::cout << "送信前署名長さ：" << signatureLength << std::endl;
+        std::cout << "送信前ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
+        std::cout << "送信前鍵：" << GetDsaParameterIP() << std::endl;
+
+
+
+	for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j != m_socketAddresses.end (); ++j)
+	{
+		Ptr<Socket> socket = j->first;
+		Ipv4InterfaceAddress iface = j->second;
+
+                //shinato
+                //helloヘッダーにDSA署名を追加
+		HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY), nodeId, signature, signatureLength);
+                
+
+		Ptr<Packet> packet = Create<Packet> ();
+		packet->AddHeader (helloHeader);
+		TypeHeader tHeader (NGPSRTYPE_HELLO);
+		packet->AddHeader (tHeader);
+		//32アドレスの場合は全ホストのブロードキャストに送信、そうでない場合はサブネット経由で送信
+		Ipv4Address destination;
+		if (iface.GetMask () == Ipv4Mask::GetOnes ())
+		{
+			destination = Ipv4Address ("255.255.255.255");
+			NS_LOG_DEBUG("Send hello to destination"<<destination );
+		}
+		else
+		{
+			destination = iface.GetBroadcast ();
+			NS_LOG_DEBUG("Send hello to destination"<<destination );
+		}
+		socket->SendTo (packet, 0, InetSocketAddress (destination, NGPSR_PORT));
+	}
+		
 }
 
 bool
@@ -1002,7 +1024,7 @@ RoutingProtocol::Start ()
         NS_LOG_FUNCTION (this);
         m_queuedAddresses.clear ();
 
-        //FIXME ajustar timer, meter valor parametrizavel
+        //FIXME タイマー設定、パラメータ値設定
         Time tableTime ("2s");
 
         switch (LocationServiceName)
@@ -1019,7 +1041,7 @@ RoutingProtocol::Start ()
 }
 
 
-//返回开始的节点
+//送信ノードに戻る
 Ptr<Ipv4Route>
 RoutingProtocol::LoopbackRoute (const Ipv4Header & hdr, Ptr<NetDevice> oif)
 {
@@ -1062,7 +1084,7 @@ RoutingProtocol::GetProtocolNumber (void) const
         return NGPSR_PORT;
 }
 
-//源节点而不是中间节点，增加的包头(不是内部packet包头）而是route包头AddHeaders),好像没有用到
+//中間ノードではなくソースノード、パケットヘッダを追加（内部パケットヘッダではなく、ルートパケットヘッダ AddHeaders）、使われていないようです
 void
 RoutingProtocol::AddHeaders (Ptr<Packet> p, Ipv4Address source, Ipv4Address destination, uint8_t protocol, Ptr<Ipv4Route> route)
 {
@@ -1075,7 +1097,7 @@ RoutingProtocol::AddHeaders (Ptr<Packet> p, Ipv4Address source, Ipv4Address dest
         myPos.y = MM->GetPosition ().y;
         Vector myVec;
         myVec=MM->GetVelocity();
-        //这里没有recoverymode？因为后面forward的函数使用了，这里的nexthop只是一个初始化而已
+        //forward機能は後で使用されるため、ここではrecoverymodeはなく、ここでのnexthopは単なる初期化です
         Ipv4Address nextHop;
 
         if(m_neighbors.isNeighbour (destination))
@@ -1108,178 +1130,128 @@ RoutingProtocol::AddHeaders (Ptr<Packet> p, Ipv4Address source, Ipv4Address dest
 
 }
 
-//fowading 是中间点传输
+//fowading 中間ノードでの送信となります。
 bool
 RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header,
                              UnicastForwardCallback ucb, ErrorCallback ecb)
 {
-        Ptr<Packet> p = packet->Copy ();
-        NS_LOG_FUNCTION (this);
-        Ipv4Address dst = header.GetDestination ();
-        Ipv4Address origin = header.GetSource ();
+		Ptr<Packet> p = packet->Copy ();
+		NS_LOG_FUNCTION (this);
+		Ipv4Address dst = header.GetDestination ();
+		Ipv4Address origin = header.GetSource ();
+		m_neighbors.Purge ();
+
+		uint32_t updated = 0;
+		Vector Position;
+		Vector RecPosition;
+		uint8_t inRec = 0;
+
+		TypeHeader tHeader (NGPSRTYPE_POS);
+		PositionHeader hdr;
+		p->RemoveHeader (tHeader);
+		
+		if (!tHeader.IsValid ())
+		{
+				NS_LOG_DEBUG ("NGPSR message " << p->GetUid () << " with unknown type received: " << tHeader.Get () << " Drop");
+				NS_LOG_DEBUG ("Forwarding meet packet drop because tHeader Deserialize failed "<<tHeader.IsValid ());
+				return false; // drop
+		}
+		if (tHeader.Get () == NGPSRTYPE_POS)
+		{
+				p->RemoveHeader (hdr);
+				Position.x = hdr.GetDstPosx ();
+				Position.y = hdr.GetDstPosy ();
+				updated = hdr.GetUpdated ();
+				RecPosition.x = hdr.GetRecPosx ();
+				RecPosition.y = hdr.GetRecPosy ();
+				inRec = hdr.GetInRec ();
+		}
+		Vector myPos;
+		Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
+		myPos.x = MM->GetPosition ().x;
+		myPos.y = MM->GetPosition ().y;
+		Vector myVec;
+		myVec=MM->GetVelocity();
+		//見つかったノードが前回の開始位置のノードよりも終点に近い場合は、リカバリーモードがジャンプします
+		if(inRec == 1 && CalculateDistance (myPos, Position) < CalculateDistance (RecPosition, Position)) {
+				inRec = 0;
+				hdr.SetInRec(0);
+				NS_LOG_LOGIC ("No longer in Recovery to " << dst << " in " << myPos);
+		}
+		//再びリカバリーモードになり、まだノードが目的地に近づいていない（上記の条件を満たしていない）場合は、フォワード送信を続けます
+		if(inRec) {
+				p->AddHeader (hdr);
+				p->AddHeader (tHeader); //フォワーディングやSendFromQueueと互換性のあるRecoveryModeになるように、ヘッダを戻す
+				RecoveryMode (dst, p, ucb, header);
+				return true;
+		}
+		//宛先ノードの位置情報を更新
+		uint32_t myUpdated = (uint32_t) m_locationService->GetEntryUpdateTime (dst).GetSeconds ();
+		if (myUpdated > updated) //ノードが宛先の位置を更新しているかどうかをチェックする
+		{
+				Position.x = m_locationService->GetPosition (dst).x;
+				Position.y = m_locationService->GetPosition (dst).y;
+				updated = myUpdated;
+		}
+
+		Ipv4Address nextHop;			
+		
+		if(m_neighbors.isNeighbour (dst))
+		{
+				nextHop = dst;
+		}
+		else
+		{
+				nextHop = m_neighbors.BestNeighbor (Position, myPos);
+		}			
+
+		if (nextHop != Ipv4Address::GetZero ())
+		{
+					//ポジションであれば、新たにブロークンヘッダーを作成し、それを追加する
+
+				PositionHeader posHeader (Position.x, Position.y,  updated, (uint64_t) 0, (uint64_t) 0, (uint8_t) 0, myPos.x, myPos.y);
+				p->AddHeader (posHeader);
+				p->AddHeader (tHeader);
+
+				//add udp headers
+				if(packet->GetSize()!=86)
+				{
+						UdpHeader udpHeader;
+						p->AddHeader(udpHeader);
+				}
+
+				Ptr<NetDevice> oif = m_ipv4->GetObject<NetDevice> ();
+				Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+				route->SetDestination (dst);
+				route->SetSource (header.GetSource ());
+				route->SetGateway (nextHop);
+
+				// FIXME: Does not work for multiple interfaces
+				route->SetOutputDevice (m_ipv4->GetNetDevice (1));
+				route->SetDestination (header.GetDestination ());
+				NS_ASSERT (route != 0);
+				NS_LOG_DEBUG ("Exist route to " << route->GetDestination () << " from interface " << route->GetOutputDevice ());
+				NS_LOG_DEBUG (route->GetOutputDevice () << " forwarding to " << dst << " from " << origin << " through " << route->GetGateway () << " packet " << p->GetUid ());
+
+				ucb (route, p, header);
+					
+				return true;
+		}
+		
+		hdr.SetInRec(1);
+		hdr.SetRecPosx (myPos.x);
+		hdr.SetRecPosy (myPos.y);
+		hdr.SetLastPosx (Position.x); //when entering Recovery, the first edge is the Dst
+		hdr.SetLastPosy (Position.y);
 
 
-        m_neighbors.Purge ();
+		p->AddHeader (hdr);
+		p->AddHeader (tHeader);
+		RecoveryMode (dst, p, ucb, header);
 
-        uint32_t updated = 0;
-        Vector Position;
-        Vector RecPosition;
-        uint8_t inRec = 0;
-
-        TypeHeader tHeader (NGPSRTYPE_POS);
-        PositionHeader hdr;
-
-        //尝试看看是不是tag的问题，好像不是
-        //DeferredRouteOutputTag tag;
-        //p->RemovePacketTag(tag);
-
-        p->RemoveHeader (tHeader);
-
-        if (!tHeader.IsValid ())
-        //if (!tHeader.IsValid ())
-        {
-                NS_LOG_DEBUG ("NGPSR message " << p->GetUid () << " with unknown type received: " << tHeader.Get () << " Drop");
-                NS_LOG_DEBUG ("Forwarding meet packet drop because tHeader Deserialize failed "<<tHeader.IsValid ());
-                return false; // drop
-        }
-        if (tHeader.Get () == NGPSRTYPE_POS)
-        {
-
-                p->RemoveHeader (hdr);
-                Position.x = hdr.GetDstPosx ();
-                Position.y = hdr.GetDstPosy ();
-                updated = hdr.GetUpdated ();
-                RecPosition.x = hdr.GetRecPosx ();
-                RecPosition.y = hdr.GetRecPosy ();
-                inRec = hdr.GetInRec ();
-        }
-
-        Vector myPos;
-        Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
-        myPos.x = MM->GetPosition ().x;
-        myPos.y = MM->GetPosition ().y;
-        Vector myVec;
-        myVec=MM->GetVelocity();
-
-
-        //如果找到的节点比之前开始的位置节点到终点的距离近，就跳出recovery mode
-        if(inRec == 1 && CalculateDistance (myPos, Position) < CalculateDistance (RecPosition, Position)) {
-                inRec = 0;
-                hdr.SetInRec(0);
-                NS_LOG_LOGIC ("No longer in Recovery to " << dst << " in " << myPos);
-        }
-
-        //如果再recovery mod，同时本节点仍不比到目的距离近（没满足上面的条件） 那么就继续向前发
-        if(inRec) {
-                p->AddHeader (hdr);
-                p->AddHeader (tHeader); //put headers back so that the RecoveryMode is compatible with Forwarding and SendFromQueue
-                RecoveryMode (dst, p, ucb, header);
-                return true;
-        }
-
-
-        //更新目的节点的位置信息
-        uint32_t myUpdated = (uint32_t) m_locationService->GetEntryUpdateTime (dst).GetSeconds ();
-        if (myUpdated > updated) //check if node has an update to the position of destination
-        {
-                Position.x = m_locationService->GetPosition (dst).x;
-                Position.y = m_locationService->GetPosition (dst).y;
-                updated = myUpdated;
-        }
-
-
-        Ipv4Address nextHop;
-
-        if(m_neighbors.isNeighbour (dst))
-        {
-                nextHop = dst;
-        }
-        else
-        {
-                //nextHop = m_neighbors.BestNeighbor (Position, myPos, myVec);
-                nextHop = m_neighbors.BestNeighbor (Position, myPos);
-        }
-
-        if (nextHop != Ipv4Address::GetZero ())
-        {
-                //如果是position 就新建新的破碎Header 增加到里面
-
-                PositionHeader posHeader (Position.x, Position.y,  updated, (uint64_t) 0, (uint64_t) 0, (uint8_t) 0, myPos.x, myPos.y);
-                p->AddHeader (posHeader);
-                p->AddHeader (tHeader);
-
-                //add udp headers
-                if(packet->GetSize()!=86)
-                {
-                        UdpHeader udpHeader;
-                        p->AddHeader(udpHeader);
-                }
-
-                Ptr<NetDevice> oif = m_ipv4->GetObject<NetDevice> ();
-                Ptr<Ipv4Route> route = Create<Ipv4Route> ();
-                route->SetDestination (dst);
-                route->SetSource (header.GetSource ());
-                route->SetGateway (nextHop);
-
-                // FIXME: Does not work for multiple interfaces
-                route->SetOutputDevice (m_ipv4->GetNetDevice (1));
-                route->SetDestination (header.GetDestination ());
-                NS_ASSERT (route != 0);
-                NS_LOG_DEBUG ("Exist route to " << route->GetDestination () << " from interface " << route->GetOutputDevice ());
-                NS_LOG_DEBUG (route->GetOutputDevice () << " forwarding to " << dst << " from " << origin << " through " << route->GetGateway () << " packet " << p->GetUid ());
-
-                ucb (route, p, header);
-                //ucb (route, p, header);
-                return true;
-
-        }
-//change here
-        // else
-        // {
-        //         nextHop = m_neighbors.BestNeighbor (Position, myPos, myVec);
-        //
-        //
-        // if (nextHop != Ipv4Address::GetZero ())
-        // {
-        //         //如果是position 就新建新的破碎Header 增加到里面
-        //
-        //         PositionHeader posHeader (Position.x, Position.y,  updated, (uint64_t) 0, (uint64_t) 0, (uint8_t) 0, myPos.x, myPos.y);
-        //         p->AddHeader (posHeader);
-        //         p->AddHeader (tHeader);
-        //
-        //
-        //         Ptr<NetDevice> oif = m_ipv4->GetObject<NetDevice> ();
-        //         Ptr<Ipv4Route> route = Create<Ipv4Route> ();
-        //         route->SetDestination (dst);
-        //         route->SetSource (header.GetSource ());
-        //         route->SetGateway (nextHop);
-        //
-        //         // FIXME: Does not work for multiple interfaces
-        //         route->SetOutputDevice (m_ipv4->GetNetDevice (1));
-        //         route->SetDestination (header.GetDestination ());
-        //         NS_ASSERT (route != 0);
-        //         NS_LOG_DEBUG ("Exist route to " << route->GetDestination () << " from interface " << route->GetOutputDevice ());
-        //         NS_LOG_DEBUG (route->GetOutputDevice () << " forwarding to " << dst << " from " << origin << " through " << route->GetGateway () << " packet " << p->GetUid ());
-        //
-        //         ucb (route, p, header);
-        //         return true;
-        //
-        // }
-        //}
-
-        hdr.SetInRec(1);
-        hdr.SetRecPosx (myPos.x);
-        hdr.SetRecPosy (myPos.y);
-        hdr.SetLastPosx (Position.x); //when entering Recovery, the first edge is the Dst
-        hdr.SetLastPosy (Position.y);
-
-
-        p->AddHeader (hdr);
-        p->AddHeader (tHeader);
-        RecoveryMode (dst, p, ucb, header);
-
-        NS_LOG_LOGIC ("Entering recovery-mode to " << dst << " in " << m_ipv4->GetAddress (1, 0).GetLocal ());
-        return true;
+		NS_LOG_LOGIC ("Entering recovery-mode to " << dst << " in " << m_ipv4->GetAddress (1, 0).GetLocal ());
+		return true;
+		
 }
 
 
@@ -1299,5 +1271,4 @@ RoutingProtocol::GetDownTarget (void) const
 
 
 }
-
 }

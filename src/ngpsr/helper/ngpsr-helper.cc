@@ -25,6 +25,7 @@
 #include "ns3/node-container.h"
 #include "ns3/callback.h"
 #include "ns3/udp-l4-protocol.h"
+#include <openssl/dsa.h>
 
 
 namespace ns3 {
@@ -49,6 +50,8 @@ NGpsrHelper::Create (Ptr<Node> node) const
   //ngpsr->SetDownTarget (ipv4l4->GetDownTarget ());
   //ipv4l4->SetDownTarget (MakeCallback (&ngpsr::RoutingProtocol::AddHeaders, ngpsr));
   node->AggregateObject (ngpsr);
+  //shinato
+  ngpsr->SetDsaParameterIP(m_dsaParameter); // m_dsaParameterの設定
   return ngpsr;
 }
 
@@ -57,6 +60,16 @@ NGpsrHelper::Set (std::string name, const AttributeValue &value)
 {
   m_agentFactory.Set (name, value);
 }
+
+//shinato
+void NGpsrHelper::SetDsaParameterIP(DSA* parameter) {
+    m_dsaParameter = parameter;
+}
+DSA* NGpsrHelper::GetDsaParameterIP() const {
+  return m_dsaParameter;
+}
+
+
 
 
 void

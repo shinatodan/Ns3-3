@@ -20,13 +20,6 @@
 #include <ns3/udp-header.h>
 #include "ns3/seq-ts-header.h"
 #include <string>
-#include <iomanip>
-
-#include <openssl/dsa.h>
-#include <openssl/err.h>
-#include <openssl/sha.h>
-#include <openssl/bio.h>
-#include <openssl/evp.h>
 
 
 #define GPSR_LS_GOD 0
@@ -97,8 +90,10 @@ Ptr<UniformRandomVariable> x = CreateObject<UniformRandomVariable> ();
 
 
 NS_OBJECT_ENSURE_REGISTERED (RoutingProtocol);
+
 /// IANAではまだ定義されていない、GPSR制御トラフィックのUDPポート
 const uint32_t RoutingProtocol::GPSR_PORT = 666;
+
 //初期化
 RoutingProtocol::RoutingProtocol ()
         : HelloInterval (Seconds (1.0)),
@@ -109,7 +104,6 @@ RoutingProtocol::RoutingProtocol ()
         PerimeterMode (false)
 {
         m_neighbors = PositionTable ();
-        //GenerateKeys();
 }
 
 
@@ -158,39 +152,6 @@ RoutingProtocol::SetLS (Ptr<LocationService> locationService)
 {
         m_locationService = locationService;
 }
-
-//shinato
-/*void RoutingProtocol::GenerateKeys() {  //DSA鍵の生成
-  dsa = DSA_new();
-  if (dsa == nullptr) {
-    std::cerr << "Failed to create DSA key" << std::endl;
-    handleErrors();
-  }
-  if (DSA_generate_parameters_ex(dsa, 2048, nullptr, 0, nullptr, nullptr, nullptr) != 1) {
-    std::cerr << "Failed to generate DSA parameters" << std::endl;
-    handleErrors();
-  }
-  if (DSA_generate_key(dsa) != 1) {
-    std::cerr << "Failed to generate DSA key pair" << std::endl;
-    handleErrors();
-  }
-}*/
-void RoutingProtocol::handleErrors()//openSSlのエラー処理
-{
-  ERR_print_errors_fp(stderr);
-  abort();
-}
-//バイナリデータを16進数文字列に変換する関数
-std::string 
-RoutingProtocol::ConvertToHex(const unsigned char* data, size_t length){
-        std::stringstream ss;
-        ss << std::hex << std::setfill('0');
-        for (size_t i = 0; i < length; ++i) {
-        ss << std::setw(2) << static_cast<int>(data[i]);
-        }
-        return ss.str();
-}
-
 
 //ノードがパケットを受信し、そのパケットを転送する必要がある場合（自分が宛先ノードでない場合）
 bool RoutingProtocol::RouteInput (Ptr<const Packet> p, const Ipv4Header &header, Ptr<const NetDevice> idev,
@@ -742,45 +703,18 @@ RoutingProtocol::RecvGPSR (Ptr<Socket> socket)
         Ipv4Address sender = inetSourceAddr.GetIpv4 ();
         Ipv4Address receiver = m_socketAddresses[socket].GetLocal ();
         NS_LOG_DEBUG("update position"<<Position.x<<Position.y );
-
-        //shinato
-        uint64_t nodeId = hdr.Getid(); //数字受け取り
-        std::string nodeid = std::to_string(nodeId);//ノードIDを文字列に変換
-        //IDのハッシュ値計算
-        unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
-        SHA256(reinterpret_cast<const unsigned char*>(message.c_str()), message.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
-
-        std::string signatureText = ConvertToHex(hdr.GetSignature(), hdr.GetSignatureLength());
-        std::cout << "送信後署名: " << signatureText << std::endl;
-        std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
-        std::cout << "送信後ハッシュ値: " << hashText << std::endl;
-        std::cout << "送信後署名長さ：" << hdr.GetSignatureLength() << std::endl;
-        std::cout << "送信後ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
-        std::cout << "送信後鍵：" << GetDsaParameter() << std::endl;
-
-
-
-        // DSA署名検証
-        if (DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), GetDsaParameter()) != 1)//検証成功で１を返す。
-        {
-                std::cerr << "DSA signature verification failed" << std::endl;
-                //handleErrors();
-        }
-        else if(DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), GetDsaParameter()) == 1)
-        {
-                std::cout << "DSA signature verification succeeded" << std::endl;
-                UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
-        }
-        //UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
-
+        //近隣ノードの情報更新
+        UpdateRouteToNeighbor (sender, receiver, Position);
 
 }
 
-//shinato
+
 void
-RoutingProtocol::UpdateRouteToNeighbor (Ipv4Address sender, Ipv4Address receiver, Vector Pos, uint64_t nodeid)
+RoutingProtocol::UpdateRouteToNeighbor (Ipv4Address sender, Ipv4Address receiver, Vector Pos)
 {
-		m_neighbors.AddEntry (sender, Pos, nodeid);
+		
+		m_neighbors.AddEntry (sender, Pos);
+        
 }
 
 
@@ -958,61 +892,31 @@ RoutingProtocol::SendHello ()
 
         positionX = MM->GetPosition ().x;
         positionY = MM->GetPosition ().y;
-
-        //shinato
-        //helloパケットに追加する数字
-        uint64_t nodeId = m_ipv4->GetObject<Node> ()->GetId ();//ノードID取得
-        std::string nodeid = std::to_string(nodeId);//ノードIDを文字列に変換
-        //IDのハッシュ値計算
-        unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
-        SHA256(reinterpret_cast<const unsigned char*>(message.c_str()), message.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
         
-        //DSA署名生成
-        unsigned char signature[DSA_size(GetDsaParameter())];
-        unsigned int signatureLength;
-        if (DSA_sign(0, digest, SHA256_DIGEST_LENGTH, signature, &signatureLength, GetDsaParameter()) != 1)
-        {
-                std::cerr << "Failed to generate DSA signature" << std::endl;
-                handleErrors();
-        }
-        std::string signatureText = ConvertToHex(signature, signatureLength);
-        std::cout << "送信前署名: " << signatureText << std::endl;
-        std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
-        std::cout << "送信前ハッシュ値: " << hashText << std::endl;
-        std::cout << "送信前署名長さ：" << signatureLength << std::endl;
-        std::cout << "送信前ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
-        std::cout << "送信前鍵：" << GetDsaParameter() << std::endl;
-
-
-
-	for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j != m_socketAddresses.end (); ++j)
-	{
-		Ptr<Socket> socket = j->first;
-		Ipv4InterfaceAddress iface = j->second;
-
-                //shinato
-                //helloヘッダーにDSA署名を追加
-		HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY), nodeId, signature, signatureLength);
-                
-
-		Ptr<Packet> packet = Create<Packet> ();
-		packet->AddHeader (helloHeader);
-		TypeHeader tHeader (GPSRTYPE_HELLO);
-		packet->AddHeader (tHeader);
-		//32アドレスの場合は全ホストのブロードキャストに送信、そうでない場合はサブネット経由で送信
-		Ipv4Address destination;
-		if (iface.GetMask () == Ipv4Mask::GetOnes ())
+		for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j != m_socketAddresses.end (); ++j)
 		{
-			destination = Ipv4Address ("255.255.255.255");
-			NS_LOG_DEBUG("Send hello to destination"<<destination );
+				Ptr<Socket> socket = j->first;
+				Ipv4InterfaceAddress iface = j->second;
+				HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY));
+
+				Ptr<Packet> packet = Create<Packet> ();
+				packet->AddHeader (helloHeader);
+				TypeHeader tHeader (GPSRTYPE_HELLO);
+				packet->AddHeader (tHeader);
+				//32アドレスの場合は全ホストのブロードキャストに送信、そうでない場合はサブネット経由で送信
+				Ipv4Address destination;
+				if (iface.GetMask () == Ipv4Mask::GetOnes ())
+				{
+						destination = Ipv4Address ("255.255.255.255");
+						NS_LOG_DEBUG("Send hello to destination"<<destination );
+				}
+				else
+				{
+						destination = iface.GetBroadcast ();
+						NS_LOG_DEBUG("Send hello to destination"<<destination );
+				}
+				socket->SendTo (packet, 0, InetSocketAddress (destination, GPSR_PORT));
 		}
-		else
-		{
-			destination = iface.GetBroadcast ();
-			NS_LOG_DEBUG("Send hello to destination"<<destination );
-		}
-		socket->SendTo (packet, 0, InetSocketAddress (destination, GPSR_PORT));
-	}
 		
 }
 
@@ -1289,3 +1193,5 @@ RoutingProtocol::GetDownTarget (void) const
 
 }
 }
+
+

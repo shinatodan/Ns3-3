@@ -24,7 +24,6 @@
 #include "ns3/node.h"
 #include "ns3/node-container.h"
 #include "ns3/ipv4-routing-helper.h"
-#include <openssl/dsa.h>
 
 
 
@@ -64,15 +63,10 @@ public:
    */
   void Set (std::string name, const AttributeValue &value);
 
-  //shinato
-  void SetDsaParameter(DSA* parameter);
-  DSA* GetDsaParameter() const;
-
   void Install (void) const;
 
 private:
   ObjectFactory m_agentFactory;
-  DSA* m_dsaParameter;
 };
 
 }

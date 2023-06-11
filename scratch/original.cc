@@ -20,6 +20,7 @@
 #include "ns3/igpsr-module.h"
 #include "ns3/pgpsr-module.h"
 #include "ns3/lgpsr-module.h"
+#include "ns3/ngpsr-module.h"
 #include "ns3/flow-monitor.h"
 #include "ns3/flow-monitor-helper.h"
 #include "ns3/flow-monitor-module.h"
@@ -286,6 +287,7 @@ RoutingHelper::ConfigureRoutingProtocol (NodeContainer& c)
   IgpsrHelper igpsr;
   LGpsrHelper lgpsr;
   PGpsrHelper pgpsr;
+  NGpsrHelper ngpsr;
 
   Ipv4ListRoutingHelper list;
   InternetStackHelper internet;
@@ -302,18 +304,6 @@ RoutingHelper::ConfigureRoutingProtocol (NodeContainer& c)
     internet.Install(c);//各ノードに(Ipv4,Ipv6,Udp,Tcp)クラスの実装を集約する
     GetRoutingStats().SetCport(698);
   }else if(m_protocolName=="GPSR"){
-    DSA* dsa = DSA_new();
-    if (dsa == nullptr) {
-      std::cerr << "Failed to create DSA key" << std::endl;
-    }
-    if (DSA_generate_parameters_ex(dsa, 2048, nullptr, 0, nullptr, nullptr, nullptr) != 1) {
-      std::cerr << "Failed to generate DSA parameters" << std::endl;
-    }
-    if (DSA_generate_key(dsa) != 1) {
-      std::cerr << "Failed to generate DSA key pair" << std::endl;
-    }
-    gpsr.SetDsaParameter(dsa);
-
     list.Add (gpsr, 100);//dsdvルーティングヘルパーとその優先度(100)を格納する
     internet.SetRoutingHelper (list);//インストール時に使用するルーティングヘルパーを設定する
     internet.Install(c);//各ノードに(Ipv4,Ipv6,Udp,Tcp)クラスの実装を集約する
@@ -325,7 +315,7 @@ RoutingHelper::ConfigureRoutingProtocol (NodeContainer& c)
     internet.Install(c);//各ノードに(Ipv4,Ipv6,Udp,Tcp)クラスの実装を集約する
     GetRoutingStats().SetCport(igpsr::RoutingProtocol::IGPSR_PORT);
   }
-  else if(m_protocolName=="LGPSR"){
+  else if(m_protocolName=="LGPSR"){//西岡プロトコル
     list.Add (lgpsr, 100);//dsdvルーティングヘルパーとその優先度(100)を格納する
     internet.SetRoutingHelper (list);//インストール時に使用するルーティングヘルパーを設定する
     internet.Install(c);//各ノードに(Ipv4,Ipv6,Udp,Tcp)クラスの実装を集約する
@@ -333,6 +323,30 @@ RoutingHelper::ConfigureRoutingProtocol (NodeContainer& c)
   }
   else if(m_protocolName=="PGPSR"){
     list.Add (pgpsr, 100);//dsdvルーティングヘルパーとその優先度(100)を格納する
+    internet.SetRoutingHelper (list);//インストール時に使用するルーティングヘルパーを設定する
+    internet.Install(c);//各ノードに(Ipv4,Ipv6,Udp,Tcp)クラスの実装を集約する
+    GetRoutingStats().SetCport(666);
+  }
+  else if(m_protocolName=="NGPSR"){//DSA署名付きのGPSR
+    //鍵生成（IP)
+    DSA* dsa_ip = DSA_new();
+    if (dsa_ip == nullptr) {
+      std::cerr << "Failed to create DSA key" << std::endl;
+    }
+    if (DSA_generate_parameters_ex(dsa_ip, 2048, nullptr, 0, nullptr, nullptr, nullptr) != 1) {
+      std::cerr << "Failed to generate DSA parameters" << std::endl;
+    }
+    if (DSA_generate_key(dsa_ip) != 1) {
+      std::cerr << "Failed to generate DSA key pair" << std::endl;
+    }
+    ngpsr.SetDsaParameterIP(dsa_ip);//IPアドレス署名用のパラメーター
+
+    //署名生成（IP)
+
+
+
+
+    list.Add (ngpsr, 100);//dsdvルーティングヘルパーとその優先度(100)を格納する
     internet.SetRoutingHelper (list);//インストール時に使用するルーティングヘルパーを設定する
     internet.Install(c);//各ノードに(Ipv4,Ipv6,Udp,Tcp)クラスの実装を集約する
     GetRoutingStats().SetCport(666);

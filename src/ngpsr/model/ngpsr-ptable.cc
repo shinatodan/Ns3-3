@@ -3,6 +3,7 @@
 #include "ns3/log.h"
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 NS_LOG_COMPONENT_DEFINE ("NGpsrTable");
 
@@ -17,7 +18,7 @@ namespace ngpsr {
 PositionTable::PositionTable ()
 {
         m_txErrorCallback = MakeCallback (&PositionTable::ProcessTxError, this);
-        m_entryLifeTime = Seconds (2); //FIXME fazer isto parametrizavel de acordo com tempo de hello
+        m_entryLifeTime = Seconds (2); //FIXME ハロータイムに合わせてパラメータ化する
 
 }
 
@@ -29,40 +30,39 @@ PositionTable::GetEntryUpdateTime (Ipv4Address id)
                 return Time (Seconds (0));
         }
         std::map<Ipv4Address, Metrix>::iterator i = m_table.find (id);
-        return i->second.time; //返回记录的当时时间
+        return i->second.time; //記録が行われた時間を返す
 }
 
 /**
  * \brief Adds entry in position table
  */
-//TODO finish velocity
+//TODO 仕上がり速度
+//shinato
 void
-PositionTable::AddEntry (Ipv4Address id, Vector position, Vector velocity)
+PositionTable::AddEntry (Ipv4Address id, Vector position, uint64_t nodeid)
 {
-        std::map<Ipv4Address, Metrix >::iterator i = m_table.find (id);
-        //NS_LOG_DEBUG("update position"<<id<<","<<velocity.x<<","<<velocity.y );
-
-
-        //id在table中，更新table,增加位置和速度信息
-        if (i != m_table.end () || id.IsEqual (i->first))
-        {
-                m_table.erase (id);
-                Metrix metrix;
-                metrix.position=position;
-                metrix.velocity=velocity;
-                metrix.time=Simulator::Now ();
-                m_table.insert (std::make_pair (id, metrix));
-                return; // 必须返回，否则后面没有办法进行
+        if(nodeid == 4){
+                std::cout << "不正なhelloデータです" << std::endl;//数字が合わなかったら隣接ノードテーブルを更新しない
         }
-
-        //id不在table，增加id
-        Metrix metrix;
-        metrix.position=position;
-        metrix.time=Simulator::Now ();
-        m_table.insert (std::make_pair (id, metrix));
-
+        else{
+		std::map<Ipv4Address, Metrix >::iterator i = m_table.find (id);
+		if(i != m_table.end() || id.IsEqual (i->first))
+		{
+			m_table.erase (id);
+			Metrix metrix;
+			metrix.position=position;
+			metrix.time=Simulator::Now ();
+			m_table.insert (std::make_pair (id, metrix));
+			return;
+		}
+		Metrix metrix;
+		metrix.position=position;
+		metrix.time=Simulator::Now ();
+		m_table.insert (std::make_pair (id, metrix));
+        }
 }
-
+		
+		
 /**
  * \brief Deletes entry in position table
  */
@@ -77,8 +77,8 @@ void PositionTable::DeleteEntry (Ipv4Address id)
  * \return Position of that id or NULL if not known
  */
 
-//获取对应address节点的位置信息
-//TODO 增加获取获取速度信息——>更可以考虑获取传输速率信息
+//対応するアドレスノードの位置情報を取得
+//TODO 取得速度の情報を得ることを追加→さらに転送速度の情報を得ることを検討
 
 Vector
 PositionTable::GetPosition (Ipv4Address id)
@@ -121,16 +121,16 @@ PositionTable::GetVelocity (Ipv4Address id)
  * \return True if the node is neighbour, false otherwise
  */
 bool
-PositionTable::isNeighbour (Ipv4Address id)
+PositionTable::isNeighbour (Ipv4Address id)//近隣ノードか調べる関数
 {
         Purge();
         std::map<Ipv4Address, Metrix >::iterator i = m_table.find (id);
-        //是邻居节点
+        //近隣ノード
         if (i != m_table.end () || id.IsEqual (i->first))
         {
                 return true;
         }
-        //不是邻居节点
+        //近隣ノードではない
         return false;
 }
 
@@ -139,7 +139,7 @@ PositionTable::isNeighbour (Ipv4Address id)
  * \brief remove entries with expired lifetime
  */
 
-//删除table中超过时间的信息
+//時間切れになったテーブルの情報を削除する
 void
 PositionTable::Purge ()
 {
@@ -159,18 +159,18 @@ PositionTable::Purge ()
 
                 if (m_entryLifeTime + GetEntryUpdateTime (i->first) <= Simulator::Now ())
                 {
-                        toErase.insert (toErase.begin (), i->first); //如果超过时间，增加到删除列表
+                        toErase.insert (toErase.begin (), i->first); //時間を超えたら削除リストに追加
 
                 }
         }
-        toErase.unique (); //唯一化
+        toErase.unique (); //独自性
 
         std::list<Ipv4Address>::iterator end = toErase.end ();
 
         for (std::list<Ipv4Address>::iterator it = toErase.begin (); it != end; ++it)
         {
 
-                m_table.erase (*it); //删除表中对应列表的地址id
+                m_table.erase (*it); //テーブル内の対応するリストのアドレスIDを削除する
 
         }
 }
@@ -179,7 +179,7 @@ PositionTable::Purge ()
  * \brief clears all entries
  */
 
-//清空table列表中所有值
+//テーブルリストのすべての値をクリア
 void
 PositionTable::Clear ()
 {
@@ -193,71 +193,8 @@ PositionTable::Clear ()
  * \return Ipv4Address of the next hop, Ipv4Address::GetZero () if no nighbour was found in greedy mode
  */
 
- //找最佳的传输节点 position是给定目的节点的位置，nodePos是源节点速度,nodeVec是发送节点速度
- //TODO 修改算法
-//
-// Ipv4Address
-// PositionTable::BestNeighbor (Vector position, Vector nodePos, Vector nodeVec)
-// {
-//   Purge ();
-//
-//   double initialDistance = CalculateDistance (nodePos, position);
-//
-//   if (m_table.empty ())
-//     {
-//       NS_LOG_DEBUG ("My neighhood table is empty; My Position: " << nodePos);
-//       return Ipv4Address::GetZero ();
-//     }     //if table is empty (no neighbours)
-//
-//   std::list<Ipv4Address> candidate;
-//   std::map<Ipv4Address, Metrix >::iterator i;
-//
-//   for (i = m_table.begin (); !(i == m_table.end ()); i++)
-//     {
-//
-//       if (initialDistance>CalculateDistance (i->second.position, position))
-//       //if (initialDistance>CalculateDistance ((i->second.position,position) position))
-//         {
-//           candidate.push_back(i->first);
-//         }
-//     }
-//   if(candidate.empty())
-//      return Ipv4Address::GetZero ();
-//   else
-//  {
-//   std::list<Ipv4Address>::iterator i = candidate.begin ();
-//   Ipv4Address bestFoundID = *candidate.begin();
-//   double bestFoundPara = 0;
-//   Vector bestPosition;
-//   //在前进的邻接点找最优的
-//   for (i = candidate.begin (); !(i == candidate.end ()); i++)
-//     {
-//       Vector tempv=GetVelocity(*i);
-//       Vector tempp=GetPosition(*i);
-//       double alpha=tempv.x-nodeVec.x;
-//       double beta=tempp.x-nodePos.x;
-//       double R=250;
-//       double gama=tempv.y-nodeVec.y;
-//       double sita=tempp.y-nodePos.y;
-//
-//       double tempt=(sqrt(pow(alpha,2)+pow(beta,2)*pow(R,2)-pow(alpha*sita-beta*gama,2))-(alpha*beta+gama*sita))/(pow(alpha,2)+pow(gama,2));
-//
-//       if (bestFoundPara < (pow(tempt,1)/pow(CalculateDistance (tempp, nodePos),0)))
-//         {
-//           bestFoundID = *i;
-//           bestFoundPara = pow(tempt,1)/pow(CalculateDistance (tempp, nodePos),0);
-//           bestPosition = tempp;
-//         }
-//
-//     }
-//     NS_LOG_DEBUG ("BestNeighbor ID: " <<bestFoundID<<"Begin ID" <<*candidate.begin () );
-//     NS_LOG_DEBUG ("Send packet to Position: " << bestPosition<<" From position"<<nodePos);
-//     return bestFoundID;
-// }
-// }
-/*
 Ipv4Address
-PositionTable::BestNeighbor (Vector position, Vector nodePos, Vector nodeVec)
+PositionTable::BestNeighbor (Vector position, Vector nodePos)//一番良い近接ノードを選択
 {
   Purge ();
 
@@ -265,221 +202,30 @@ PositionTable::BestNeighbor (Vector position, Vector nodePos, Vector nodeVec)
 
   if (m_table.empty ())
     {
-      NS_LOG_DEBUG ("My neighhood table is empty; My Position: " << nodePos);
+      NS_LOG_DEBUG ("BestNeighbor table is empty; Position: " << position);
       return Ipv4Address::GetZero ();
-    }     //if table is empty (no neighbours)
+    }     //テーブルが空の場合（隣にノードがない場合）
 
-  std::list<Ipv4Address> candidate;
+  Ipv4Address bestFoundID = m_table.begin ()->first;
+  double bestFoundDistance = CalculateDistance (m_table.begin ()->second.position, position);
   std::map<Ipv4Address, Metrix >::iterator i;
-
   for (i = m_table.begin (); !(i == m_table.end ()); i++)
     {
-
-      if (initialDistance>CalculateDistance (i->second.position, position))
-      //if (initialDistance>CalculateDistance ((i->second.position,position) position))
+      if (bestFoundDistance > CalculateDistance (i->second.position, position))
         {
-          candidate.push_back(i->first);
+          bestFoundID = i->first;
+          bestFoundDistance = CalculateDistance (i->second.position, position);
         }
     }
-  if(candidate.empty())
-     return Ipv4Address::GetZero ();
-  else
- {
-  std::list<Ipv4Address>::iterator i = candidate.begin ();
-  Ipv4Address bestFoundID = *candidate.begin();
-  double bestFoundPara = 0;
-  Vector bestPosition;
-  //在前进的邻接点找最优的
-  for (i = candidate.begin (); !(i == candidate.end ()); i++)
-    {
-      Vector tempv=GetVelocity(*i);
-      Vector tempp=GetPosition(*i);
-      double alpha=tempv.x-nodeVec.x;
-      double beta=tempp.x-nodePos.x;
-      double R=250;
-      double gama=tempv.y-nodeVec.y;
-      double sita=tempp.y-nodePos.y;
 
-      double tempt=(sqrt(pow(alpha,2)+pow(beta,2)*pow(R,2)-pow(alpha*sita-beta*gama,2))-(alpha*beta+gama*sita))/(pow(alpha,2)+pow(gama,2));
-
-      if (bestFoundPara < (pow(tempt,1)*pow(CalculateDistance (tempp, nodePos),0)))
-        {
-          bestFoundID = *i;
-          bestFoundPara = pow(tempt,1)*pow(CalculateDistance (tempp, nodePos),0);
-          bestPosition = tempp;
-        }
-
-    }
-    NS_LOG_DEBUG ("BestNeighbor ID: " <<bestFoundID<<"Begin ID" <<*candidate.begin () );
-    NS_LOG_DEBUG ("Send packet to Position: " << bestPosition<<" From position"<<nodePos);
+  if(initialDistance > bestFoundDistance){
+  	NS_LOG_DEBUG ("BestFoound ID is  " <<bestFoundID );
     return bestFoundID;
 }
-}*/
+  else
+    return Ipv4Address::GetZero (); //so it enters Recovery-mode
 
-Ipv4Address
-PositionTable::BestNeighbor (Vector position, Vector nodePos)
-{
- {
-      Purge ();
-		std::cout << "ngpsr-start" <<  std::endl;
-      if (m_table.empty ())
-        {
-          NS_LOG_DEBUG ("BestNeighbor table is empty; Position: " << position);
-          return Ipv4Address::GetZero ();
-        }     //if table is empty (no neighbours)
-
-      Ipv4Address bestFoundID = Ipv4Address::GetZero();
-
-      std::map<Ipv4Address, Metrix >::iterator i;;
-      double bestFoundtime = 100000000000000;
-      for (i = m_table.begin (); !(i == m_table.end ()); i++)
-        {
-         Vector distvec,neigh_velocity,OP_vec;
-         //正射影ベクトルを求める
-         neigh_velocity = i->second.velocity;
-         distvec.x=position.x-i->second.position.x;
-         distvec.y=position.y-i->second.position.y;
-         double Travel_time;
-         //内積
-         //double inner_product = distvec.x*neigh_velocity.x+distvec.y*neigh_velocity.y;
-         //n2dは隣接ノードと宛先ノードとの距離
-         double n2d = CalculateDistance(i->second.position,position);
-        /*double tmp = inner_product/std::pow(tmpdis, 2);
-         Orthographic projection(正射影ベクトル)
-         OP_vec.x = distvec.x*tmp;
-         OP_vec.y = distvec.y*tmp;
-         //提案
-         double tmpvec = std::sqrt((std::pow(OP_vec.x, 2) + std::pow(OP_vec.y, 2)));
-         double tmptime = tmpdis/tmpvec;
-         */
-         //std::cout << "自身の座標 =" <<  nodePos.x <<" , "<<nodePos.y<< std::endl;         
-         //std::cout << "x,y =" <<  i->second.position.x <<" , "<<i->second.position.y<< std::endl;
-         //std::cout << " 2点間距離" <<  n2d << std::endl;
-         //std::cout << " 方向ベクトル" <<  distvec.x <<" , "<<distvec.y<< std::endl;
-         
-
-
-         Travel_time = std::pow(n2d, 2)/(distvec.x*neigh_velocity.x)+(distvec.y*neigh_velocity.y);
-           // std::cout << "distvec  is  " <<"( "<<distvec.x<<" , "<<distvec.y<<" ) "<<  std::endl;
-           // std::cout << "neigh_velocity  is  " <<"( "<<neigh_velocity.x<<" , "<<neigh_velocity.y<<" ) "<<  std::endl;
-           // std::cout <<  std::endl;
-            
-            //std::cout << "inner_product.x  is  " <<distvec.x*neigh_velocity.x<<  std::endl;
-            //std::cout << "inner_product.x  is  " <<distvec.x*neigh_velocity.x<<  std::endl;
-            //std::cout << "inner_product.x  is  " <<distvec.x*neigh_velocity.x<<  std::endl;
-            //std::cout << "inner_product.y  is  " <<distvec.y*neigh_velocity.y<<  std::endl;
-         	//std::cout << "Travel_time  is" <<Travel_time<<  std::endl;
-         				
-         if(0<Travel_time && Travel_time<bestFoundtime){
-			bestFoundtime = Travel_time;
-			bestFoundID = i->first;
-		 }     
-        }
-        if(bestFoundID!=Ipv4Address::GetZero ()){
-			//std::cout << bestFoundID <<  std::endl;
-			NS_LOG_DEBUG ("BestFoound ID is  " <<bestFoundID );
-			return bestFoundID;
-        }
-        else
-          return Ipv4Address::GetZero (); //so it enters Recovery-mode
-    }
 }
-
-//  //找最佳的传输节点 position是给定目的节点的位置，nodePos是源节点速度,nodeVec是发送节点速度
-//  //TODO 修改算法
-//
-// Ipv4Address
-// PositionTable::BestNeighbor (Vector position, Vector nodePos, Vector nodeVec)
-// {
-//   Purge ();
-//
-//   double initialDistance = CalculateDistance (nodePos, position);
-//
-//   if (m_table.empty ())
-//     {
-//       NS_LOG_DEBUG ("BestNeighbor table is empty; Position: " << position);
-//       return Ipv4Address::GetZero ();
-//     }     //if table is empty (no neighbours)
-//
-//   Ipv4Address bestFoundID = m_table.begin ()->first;
-//   double bestFoundDistance = CalculateDistance (m_table.begin ()->second.position, position); //计算邻居节点距离目的节点最短的节点
-//   std::map<Ipv4Address, Metrix >::iterator i;
-//
-//   //找到邻居节点距离目的节点最近的那个邻居节点
-//   for (i = m_table.begin (); !(i == m_table.end ()); i++)
-//     {
-//       if (bestFoundDistance > CalculateDistance (i->second.position, position))
-//         {
-//           bestFoundID = i->first;
-//           bestFoundDistance = CalculateDistance (i->second.position, position);
-//           NS_LOG_DEBUG ("Best distance "<<bestFoundDistance);
-//         }
-//     }
-//   //找到最好的邻居节点，返回邻居节点address
-//   if(initialDistance > bestFoundDistance)
-//     return bestFoundID;
-//
-//   //如果邻居没有比源节点距离目的节点最近的节点，就返回没有找到，进行recovery-mode
-//   else
-//   {
-//     NS_LOG_DEBUG ("No best ID ");
-//     return Ipv4Address::GetZero (); //so it enters Recovery-mode
-// }
-// }
-
-//
-// //找最佳的传输节点 position是给定目的节点的位置，nodePos是源节点速度,nodeVec是发送节点速度
-// //TODO 修改算法
-//
-// Ipv4Address
-// PositionTable::BestNeighbor (Vector position, Vector nodePos, Vector nodeVec)
-// {
-//         Purge ();
-//
-//         double initialDistance = CalculateDistance (nodePos, position);
-//
-//         if (m_table.empty ())
-//         {
-//                 NS_LOG_DEBUG ("BestNeighbor table is empty; Position: " << position);
-//                 return Ipv4Address::GetZero ();
-//         } //if table is empty (no neighbours)
-//
-//         Ipv4Address bestFoundID = m_table.begin ()->first;
-//         double bestFoundDistance = CalculateDistance (m_table.begin ()->second.position, position); //计算邻居节点距离目的节点最短的节点
-//         std::map<Ipv4Address, Metrix >::iterator i;
-//
-//         //找到邻居节点距离目的节点最近的那个邻居节点
-//         for (i = m_table.begin (); !(i == m_table.end ()); i++)
-//         {
-//           NodeList::Iterator listEnd = NodeList::End ();
-//                 for (NodeList::Iterator j = NodeList::Begin (); j != listEnd; j++)
-//                 {
-//                         Ptr<Node> node = *j;
-//                         if (node->GetObject<Ipv4> ()->GetAddress (1, 0).GetLocal () == i->first)
-//                         {
-//                                if (node->GetId()>39)
-//                                bestFoundID=i->first;
-//                                return bestFoundID;
-//                         }
-//                 }
-//
-//                 if (bestFoundDistance > CalculateDistance (i->second.position, position))
-//                 {
-//                         bestFoundID = i->first;
-//                         bestFoundDistance = CalculateDistance (i->second.position, position);
-//                 }
-//         }
-//         //找到最好的邻居节点，返回邻居节点address
-//         if(initialDistance > bestFoundDistance)
-//                 return bestFoundID;
-//
-//         //如果邻居没有比源节点距离目的节点最近的节点，就返回没有找到，进行recovery-mode
-//         else
-//                 return Ipv4Address::GetZero ();  //so it enters Recovery-mode
-// }
-//
-//
-
 
 /**
  * \brief Gets next hop according to NGPSR recovery-mode protocol (right hand rule)
@@ -488,7 +234,7 @@ PositionTable::BestNeighbor (Vector position, Vector nodePos)
  * \return Ipv4Address of the next hop, Ipv4Address::GetZero () if no nighbour was found in greedy mode
  */
 
-//根据右手准则找邻居节点,没有邻居就返回address.getzero（）
+//右手のルールに従って隣接するノードを見つけ、隣接するノードがない場合はaddress.getzero()を返す
 
 Ipv4Address
 PositionTable::BestAngle (Vector previousHop, Vector nodePos)
@@ -516,7 +262,7 @@ PositionTable::BestAngle (Vector previousHop, Vector nodePos)
                         bestFoundAngle = tmpAngle;
                 }
         }
-        if(bestFoundID == Ipv4Address::GetZero ()) //only if the only neighbour is who sent the packet
+        if(bestFoundID == Ipv4Address::GetZero ()) //パケットを送信したのが唯一の隣人である場合のみ
         {
                 bestFoundID = m_table.begin ()->first;
         }
@@ -524,7 +270,7 @@ PositionTable::BestAngle (Vector previousHop, Vector nodePos)
 }
 
 
-//Gives angle between the vector CentrePos-Refpos to the vector CentrePos-node counterclockwise
+//ベクトルCentrePos-RefposとベクトルCentrePos-nodeの間の角度を反時計回りに与えます。
 double
 PositionTable::GetAngle (Vector centrePos, Vector refPos, Vector node){
         double const PI = 4*atan(1);

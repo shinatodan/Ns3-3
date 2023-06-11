@@ -37,14 +37,9 @@ PositionTable::GetEntryUpdateTime (Ipv4Address id)
  * \brief Adds entry in position table
  */
 //TODO 仕上がり速度
-//shinato
 void
-PositionTable::AddEntry (Ipv4Address id, Vector position, uint64_t nodeid)
+PositionTable::AddEntry (Ipv4Address id, Vector position)
 {
-        if(nodeid == 4){
-                std::cout << "不正なhelloデータです" << std::endl;//数字が合わなかったら隣接ノードテーブルを更新しない
-        }
-        else{
 		std::map<Ipv4Address, Metrix >::iterator i = m_table.find (id);
 		if(i != m_table.end() || id.IsEqual (i->first))
 		{
@@ -59,7 +54,6 @@ PositionTable::AddEntry (Ipv4Address id, Vector position, uint64_t nodeid)
 		metrix.position=position;
 		metrix.time=Simulator::Now ();
 		m_table.insert (std::make_pair (id, metrix));
-        }
 }
 		
 		
@@ -121,7 +115,7 @@ PositionTable::GetVelocity (Ipv4Address id)
  * \return True if the node is neighbour, false otherwise
  */
 bool
-PositionTable::isNeighbour (Ipv4Address id)//近隣ノードか調べる関数
+PositionTable::isNeighbour (Ipv4Address id)
 {
         Purge();
         std::map<Ipv4Address, Metrix >::iterator i = m_table.find (id);
@@ -194,7 +188,7 @@ PositionTable::Clear ()
  */
 
 Ipv4Address
-PositionTable::BestNeighbor (Vector position, Vector nodePos)//一番良い近接ノードを選択
+PositionTable::BestNeighbor (Vector position, Vector nodePos)
 {
   Purge ();
 
