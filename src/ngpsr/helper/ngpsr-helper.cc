@@ -54,6 +54,9 @@ NGpsrHelper::Create (Ptr<Node> node) const
   ngpsr->SetDsaParameterIP(m_dsaParameter); // m_dsaParameterの設定
   ngpsr->SetDsaSignatureIP(m_dsaSignatureIP);
   ngpsr->SetDsaSignatureLengthIP(m_dsaSignatureLengthIP);
+  ngpsr->SetDsaParameterPOS(m_dsaposParameter); // m_dsaParameterの設定
+  ngpsr->SetDsaSignaturePOS(m_dsaposSignatureIP);
+  ngpsr->SetDsaSignatureLengthPOS(m_dsaposSignatureLengthIP);
   return ngpsr;
 }
 
@@ -70,7 +73,6 @@ void NGpsrHelper::SetDsaParameterIP(DSA* parameter) {
 DSA* NGpsrHelper::GetDsaParameterIP() const {
   return m_dsaParameter;
 }
-
 void NGpsrHelper::SetDsaSignatureIP(const unsigned char* signature)
 {
     memcpy(m_dsaSignatureIP, signature, 128);
@@ -79,7 +81,6 @@ const unsigned char* NGpsrHelper::GetDsaSignatureIP() const
 {
     return m_dsaSignatureIP;
 }
-
 void NGpsrHelper::SetDsaSignatureLengthIP(unsigned int length)
 {
     m_dsaSignatureLengthIP = length;
@@ -87,6 +88,29 @@ void NGpsrHelper::SetDsaSignatureLengthIP(unsigned int length)
 unsigned int NGpsrHelper::GetDsaSignatureLengthIP() const
 {
     return m_dsaSignatureLengthIP;
+}
+
+void NGpsrHelper::SetDsaParameterPOS(DSA* posparameter) {
+    m_dsaposParameter = posparameter;
+}
+DSA* NGpsrHelper::GetDsaParameterPOS() const {
+  return m_dsaposParameter;
+}
+void NGpsrHelper::SetDsaSignaturePOS(const unsigned char* possignature)
+{
+    memcpy(m_dsaposSignatureIP, possignature, 128);
+}
+const unsigned char* NGpsrHelper::GetDsaSignaturePOS() const
+{
+    return m_dsaposSignatureIP;
+}
+void NGpsrHelper::SetDsaSignatureLengthPOS(unsigned int poslength)
+{
+    m_dsaposSignatureLengthIP = poslength;
+}
+unsigned int NGpsrHelper::GetDsaSignatureLengthPOS() const
+{
+    return m_dsaposSignatureLengthIP;
 }
 
 

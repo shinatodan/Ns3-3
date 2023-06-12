@@ -729,12 +729,15 @@ RoutingProtocol::RecvNGPSR (Ptr<Socket> socket)
 
         //shinato
         uint64_t nodeId = hdr.Getid(); //数字受け取り
-        //std::string nodeid = std::to_string(nodeId);//ノードIDを文字列に変換
-        std::string nodeid = "NGPSR";
+        std::string protocol = "NGPSR";
+        std::string tracefile = "/home/hry-user/ns-allinone-3.26/ns-3.26/node/test.tcl";
 
         //IDのハッシュ値計算
         unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
-        SHA256(reinterpret_cast<const unsigned char*>(nodeid.c_str()), nodeid.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
+        SHA256(reinterpret_cast<const unsigned char*>(protocol.c_str()), protocol.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
+
+        unsigned char digest2[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
+        SHA256(reinterpret_cast<const unsigned char*>(tracefile.c_str()), tracefile.length(), digest2);//与えられたデータ（メッセージ）のハッシュ値を計算
 
         //std::string signatureText = ConvertToHex(hdr.GetSignature(), hdr.GetSignatureLength());
         //std::cout << "送信後署名: " << signatureText << std::endl;
@@ -749,16 +752,21 @@ RoutingProtocol::RecvNGPSR (Ptr<Socket> socket)
         // DSA署名検証
         if (DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), GetDsaParameterIP()) != 1)//検証成功で１を返す。
         {
-                std::cerr << "DSA signature verification failed" << std::endl;
-                //handleErrors();
+                std::cerr << "DSA IPsignature verification failed" << std::endl;
         }
         else if(DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), GetDsaParameterIP()) == 1)
         {
-                std::cout << "DSA signature verification succeeded" << std::endl;
-                UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
+                std::cout << "DSA IPsignature verification succeeded" << std::endl;
+                if (DSA_verify(0, digest2, SHA256_DIGEST_LENGTH, hdr.GetPosSignature(), hdr.GetPosSignatureLength(), GetDsaParameterPOS()) != 1)//検証成功で１を返す。
+                {
+                        std::cerr << "DSA possignature verification failed" << std::endl;
+                }
+                else if(DSA_verify(0, digest2, SHA256_DIGEST_LENGTH, hdr.GetPosSignature(), hdr.GetPosSignatureLength(), GetDsaParameterPOS()) == 1)
+                {
+                        std::cout << "DSA possignature verification succeeded" << std::endl;
+                        UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
+                }
         }
-        //UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
-
 
 }
 
@@ -970,6 +978,9 @@ RoutingProtocol::SendHello ()
         const unsigned char* signature = GetDsaSignatureIP();
         unsigned int signatureLength = GetDsaSignatureLengthIP();
 
+        const unsigned char* possignature = GetDsaSignaturePOS();
+        unsigned int possignatureLength = GetDsaSignatureLengthPOS();
+
 
         //std::string signatureText = ConvertToHex(signature, signatureLength);
         //std::cout << "送信前署名: " << signatureText << std::endl;
@@ -988,7 +999,7 @@ RoutingProtocol::SendHello ()
 
                 //shinato
                 //helloヘッダーにDSA署名を追加
-		HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY), nodeId, signature, signatureLength);
+		HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY), nodeId, signature, signatureLength, possignature, possignatureLength);
                 
 
 		Ptr<Packet> packet = Create<Packet> ();

@@ -70,7 +70,7 @@ class HelloHeader : public Header
 public:
   /// c-tor
   //shinato
-  HelloHeader (uint64_t originPosx = 0, uint64_t originPosy = 0, uint64_t node = 0, const unsigned char* signature = nullptr, unsigned int signatureLength = 0);
+  HelloHeader (uint64_t originPosx = 0, uint64_t originPosy = 0, uint64_t node = 0, const unsigned char* signature = nullptr, unsigned int signatureLength = 0, const unsigned char* possignature = nullptr, unsigned int possignatureLength = 0);
 
   ///\name Header serialization/deserialization
   //\{
@@ -122,6 +122,17 @@ public:
   unsigned int GetSignatureLength() const{
     return m_signatureLength;
   }
+  const unsigned char* GetPosSignature() const
+  {
+    return m_possignature;
+  }
+  void SetPosSignatureLength (unsigned int possignatureLength)
+  {
+    m_possignatureLength = possignatureLength;
+  }
+  unsigned int GetPosSignatureLength() const{
+    return m_possignatureLength;
+  }
 
   //\}
 
@@ -134,6 +145,8 @@ private:
   uint64_t nodeid;
   unsigned char m_signature[128];
   unsigned int m_signatureLength;
+  unsigned char m_possignature[128];
+  unsigned int m_possignatureLength;
 };
 
 std::ostream & operator<< (std::ostream & os, HelloHeader const &);

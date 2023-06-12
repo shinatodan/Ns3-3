@@ -65,13 +65,21 @@ public:
   void Set (std::string name, const AttributeValue &value);
 
   //shinato
+  //IP
   void SetDsaParameterIP(DSA* parameter);
   DSA* GetDsaParameterIP() const;
-
   void SetDsaSignatureIP(const unsigned char* signature);
   const unsigned char* GetDsaSignatureIP() const;
   void SetDsaSignatureLengthIP(unsigned int length);
   unsigned int GetDsaSignatureLengthIP() const;
+
+  //位置
+  void SetDsaParameterPOS(DSA* posparamater);
+  DSA* GetDsaParameterPOS() const;
+  void SetDsaSignaturePOS(const unsigned char* possignature);
+  const unsigned char* GetDsaSignaturePOS() const;
+  void SetDsaSignatureLengthPOS(unsigned int poslength);
+  unsigned int GetDsaSignatureLengthPOS() const;
 
   void Install (void) const;
 
@@ -80,6 +88,9 @@ private:
   DSA* m_dsaParameter;
   unsigned char m_dsaSignatureIP[128];
   unsigned int m_dsaSignatureLengthIP;
+  DSA* m_dsaposParameter;
+  unsigned char m_dsaposSignatureIP[128];
+  unsigned int m_dsaposSignatureLengthIP;
 };
 
 }

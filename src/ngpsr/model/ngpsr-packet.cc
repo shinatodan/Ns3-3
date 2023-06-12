@@ -111,14 +111,18 @@ operator<< (std::ostream & os, TypeHeader const & h)
 // HELLO
 //-----------------------------------------------------------------------------
 //shinato
-HelloHeader::HelloHeader (uint64_t originPosx, uint64_t originPosy, uint64_t node, const unsigned char* signature, unsigned int signatureLength)
+HelloHeader::HelloHeader (uint64_t originPosx, uint64_t originPosy, uint64_t node, const unsigned char* signature, unsigned int signatureLength, const unsigned char* possignature, unsigned int possignatureLength)
   : m_originPosx (originPosx),
     m_originPosy (originPosy),
     nodeid (node),
-    m_signatureLength(signatureLength)
+    m_signatureLength(signatureLength),
+    m_possignatureLength(possignatureLength)
 {
   if (signature != nullptr) {
     memcpy(m_signature, signature, signatureLength);
+  }
+  if (possignature != nullptr) {
+    memcpy(m_possignature, possignature, possignatureLength);
   }
 }
 
@@ -146,7 +150,7 @@ HelloHeader::GetSerializedSize () const
   //shinato
   //helloパケット数×８
   //return 32;
-  return sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t) + m_signatureLength;
+  return sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t) + m_signatureLength + sizeof(uint32_t) + m_possignatureLength;
 }
 
 void
@@ -163,6 +167,8 @@ HelloHeader::Serialize (Buffer::Iterator i) const
   i.WriteHtonU64(nodeid);
   i.WriteHtonU32(m_signatureLength); 
   i.Write(m_signature, m_signatureLength);
+  i.WriteHtonU32(m_possignatureLength); 
+  i.Write(m_possignature, m_possignatureLength);
 
 }
 
@@ -176,6 +182,8 @@ HelloHeader::Deserialize (Buffer::Iterator start)
   nodeid = start.ReadNtohU64();
   m_signatureLength = start.ReadNtohU32();
   start.Read(m_signature, m_signatureLength);
+  m_possignatureLength = start.ReadNtohU32();
+  start.Read(m_possignature, m_possignatureLength);
 
   // シリアル化されるデータのサイズを取得
   uint32_t size = GetSerializedSize();
