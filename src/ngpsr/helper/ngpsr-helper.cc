@@ -57,6 +57,7 @@ NGpsrHelper::Create (Ptr<Node> node) const
   ngpsr->SetDsaParameterPOS(m_dsaposParameter); // m_dsaParameterの設定
   ngpsr->SetDsaSignaturePOS(m_dsaposSignatureIP);
   ngpsr->SetDsaSignatureLengthPOS(m_dsaposSignatureLengthIP);
+  ngpsr->Settracefile(m_tracefile);
   return ngpsr;
 }
 
@@ -111,6 +112,13 @@ void NGpsrHelper::SetDsaSignatureLengthPOS(unsigned int poslength)
 unsigned int NGpsrHelper::GetDsaSignatureLengthPOS() const
 {
     return m_dsaposSignatureLengthIP;
+}
+
+void NGpsrHelper::Settracefile(std::string tracefile) {
+    m_tracefile = tracefile;
+}
+std::string NGpsrHelper::Gettracefile() const {
+  return m_tracefile;
 }
 
 

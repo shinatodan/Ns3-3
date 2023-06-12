@@ -221,6 +221,7 @@ RoutingHelper::ConfigureRoutingProtocol (NodeContainer& c)
     
     ngpsr.SetDsaParameterIP(dsa_ip);//IPアドレス署名用のパラメーター
     ngpsr.SetDsaParameterPOS(dsa_pos);
+    ngpsr.Settracefile(m_traceFile);
 
     //署名生成（IP)
     unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数

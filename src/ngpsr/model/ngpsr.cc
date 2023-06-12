@@ -730,7 +730,7 @@ RoutingProtocol::RecvNGPSR (Ptr<Socket> socket)
         //shinato
         uint64_t nodeId = hdr.Getid(); //数字受け取り
         std::string protocol = "NGPSR";
-        std::string tracefile = "/home/hry-user/ns-allinone-3.26/ns-3.26/node/test.tcl";
+        std::string tracefile = Gettracefile();
 
         //IDのハッシュ値計算
         unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数

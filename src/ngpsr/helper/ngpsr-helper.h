@@ -81,6 +81,9 @@ public:
   void SetDsaSignatureLengthPOS(unsigned int poslength);
   unsigned int GetDsaSignatureLengthPOS() const;
 
+  void Settracefile(std::string tracefile);
+  std::string Gettracefile() const;
+
   void Install (void) const;
 
 private:
@@ -91,6 +94,7 @@ private:
   DSA* m_dsaposParameter;
   unsigned char m_dsaposSignatureIP[128];
   unsigned int m_dsaposSignatureLengthIP;
+  std::string m_tracefile;
 };
 
 }

@@ -48,6 +48,7 @@ class RoutingProtocol : public Ipv4RoutingProtocol
   DSA* dsa_pos;
   unsigned char m_dsaSignaturePOS[128];
   unsigned int m_dsaSignatureLengthPOS;
+  std::string m_tracefile;
 public://コンストラクタ
   static TypeId GetTypeId (void);
   static const uint32_t NGPSR_PORT;
@@ -129,6 +130,13 @@ public://コンストラクタ
   unsigned int GetDsaSignatureLengthPOS() const
   {
       return m_dsaSignatureLengthPOS;
+  }
+
+  void Settracefile(std::string tracefile) {
+    m_tracefile = tracefile;
+  }
+  std::string Gettracefile() const {
+    return m_tracefile;
   }
 
 
