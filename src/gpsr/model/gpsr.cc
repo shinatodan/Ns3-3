@@ -712,8 +712,22 @@ RoutingProtocol::RecvGPSR (Ptr<Socket> socket)
 void
 RoutingProtocol::UpdateRouteToNeighbor (Ipv4Address sender, Ipv4Address receiver, Vector Pos)
 {
+		//shinato
+		uint32_t flag = 0;
+	
+		if(sender==("192.168.1.24"))//位置情報を変えるノード(192.168.1.nodeId+1)
+		{
+			flag = 0;
+		}
+		else if(sender==("192.168.1.29"))
+		{
+			flag = 0;
+		}
 		
-		m_neighbors.AddEntry (sender, Pos);
+		else{
+			flag = 0;
+		}
+		m_neighbors.AddEntry (sender, Pos, flag);
         
 }
 
@@ -880,6 +894,7 @@ RoutingProtocol::HelloTimerExpire ()
         HelloIntervalTimer.Schedule (HelloInterval + JITTER);
 }
 
+
 //Hello Packetsの送信
 void
 RoutingProtocol::SendHello ()
@@ -893,30 +908,30 @@ RoutingProtocol::SendHello ()
         positionX = MM->GetPosition ().x;
         positionY = MM->GetPosition ().y;
         
-		for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j != m_socketAddresses.end (); ++j)
-		{
-				Ptr<Socket> socket = j->first;
-				Ipv4InterfaceAddress iface = j->second;
-				HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY));
+			for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j != m_socketAddresses.end (); ++j)
+			{
+					Ptr<Socket> socket = j->first;
+					Ipv4InterfaceAddress iface = j->second;
+					HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY));
 
-				Ptr<Packet> packet = Create<Packet> ();
-				packet->AddHeader (helloHeader);
-				TypeHeader tHeader (GPSRTYPE_HELLO);
-				packet->AddHeader (tHeader);
-				//32アドレスの場合は全ホストのブロードキャストに送信、そうでない場合はサブネット経由で送信
-				Ipv4Address destination;
-				if (iface.GetMask () == Ipv4Mask::GetOnes ())
-				{
-						destination = Ipv4Address ("255.255.255.255");
-						NS_LOG_DEBUG("Send hello to destination"<<destination );
-				}
-				else
-				{
-						destination = iface.GetBroadcast ();
-						NS_LOG_DEBUG("Send hello to destination"<<destination );
-				}
-				socket->SendTo (packet, 0, InetSocketAddress (destination, GPSR_PORT));
-		}
+					Ptr<Packet> packet = Create<Packet> ();
+					packet->AddHeader (helloHeader);
+					TypeHeader tHeader (GPSRTYPE_HELLO);
+					packet->AddHeader (tHeader);
+					//32アドレスの場合は全ホストのブロードキャストに送信、そうでない場合はサブネット経由で送信
+					Ipv4Address destination;
+					if (iface.GetMask () == Ipv4Mask::GetOnes ())
+					{
+							destination = Ipv4Address ("255.255.255.255");
+							NS_LOG_DEBUG("Send hello to destination"<<destination );
+					}
+					else
+					{
+							destination = iface.GetBroadcast ();
+							NS_LOG_DEBUG("Send hello to destination"<<destination );
+					}
+					socket->SendTo (packet, 0, InetSocketAddress (destination, GPSR_PORT));
+			}
 		
 }
 
@@ -1056,123 +1071,141 @@ bool
 RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header,
                              UnicastForwardCallback ucb, ErrorCallback ecb)
 {
-		Ptr<Packet> p = packet->Copy ();
-		NS_LOG_FUNCTION (this);
-		Ipv4Address dst = header.GetDestination ();
-		Ipv4Address origin = header.GetSource ();
-		m_neighbors.Purge ();
+	    //shinato 転送しない悪意ノード
+		int not_foward = m_ipv4->GetObject<Node> ()->GetId ();
 
-		uint32_t updated = 0;
-		Vector Position;
-		Vector RecPosition;
-		uint8_t inRec = 0;
-
-		TypeHeader tHeader (GPSRTYPE_POS);
-		PositionHeader hdr;
-		p->RemoveHeader (tHeader);
 		
-		if (!tHeader.IsValid ())
-		{
-				NS_LOG_DEBUG ("GPSR message " << p->GetUid () << " with unknown type received: " << tHeader.Get () << " Drop");
-				NS_LOG_DEBUG ("Forwarding meet packet drop because tHeader Deserialize failed "<<tHeader.IsValid ());
-				return false; // drop
-		}
-		if (tHeader.Get () == GPSRTYPE_POS)
-		{
-				p->RemoveHeader (hdr);
-				Position.x = hdr.GetDstPosx ();
-				Position.y = hdr.GetDstPosy ();
-				updated = hdr.GetUpdated ();
-				RecPosition.x = hdr.GetRecPosx ();
-				RecPosition.y = hdr.GetRecPosy ();
-				inRec = hdr.GetInRec ();
-		}
-		Vector myPos;
-		Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
-		myPos.x = MM->GetPosition ().x;
-		myPos.y = MM->GetPosition ().y;
-		Vector myVec;
-		myVec=MM->GetVelocity();
-		//見つかったノードが前回の開始位置のノードよりも終点に近い場合は、リカバリーモードがジャンプします
-		if(inRec == 1 && CalculateDistance (myPos, Position) < CalculateDistance (RecPosition, Position)) {
-				inRec = 0;
-				hdr.SetInRec(0);
-				NS_LOG_LOGIC ("No longer in Recovery to " << dst << " in " << myPos);
-		}
-		//再びリカバリーモードになり、まだノードが目的地に近づいていない（上記の条件を満たしていない）場合は、フォワード送信を続けます
-		if(inRec) {
-				p->AddHeader (hdr);
-				p->AddHeader (tHeader); //フォワーディングやSendFromQueueと互換性のあるRecoveryModeになるように、ヘッダを戻す
-				RecoveryMode (dst, p, ucb, header);
-				return true;
-		}
-		//宛先ノードの位置情報を更新
-		uint32_t myUpdated = (uint32_t) m_locationService->GetEntryUpdateTime (dst).GetSeconds ();
-		if (myUpdated > updated) //ノードが宛先の位置を更新しているかどうかをチェックする
-		{
-				Position.x = m_locationService->GetPosition (dst).x;
-				Position.y = m_locationService->GetPosition (dst).y;
-				updated = myUpdated;
-		}
-
-		Ipv4Address nextHop;			
-		
-		if(m_neighbors.isNeighbour (dst))
-		{
-				nextHop = dst;
+		//if(not_foward == 59 ||not_foward == 10 ||not_foward == 9 ||not_foward == 7 ||not_foward == 18 ||not_foward == 14 ||not_foward == 15 ||not_foward == 12 ||not_foward == 43 ||not_foward == 11)
+		//if(not_foward == 20||not_foward ==25)
+                if(not_foward == 20000||not_foward ==250000)
+		{	
+			return true;
 		}
 		else
 		{
-				nextHop = m_neighbors.BestNeighbor (Position, myPos);
-		}			
+			Ptr<Packet> p = packet->Copy ();
+			NS_LOG_FUNCTION (this);
+			Ipv4Address dst = header.GetDestination ();
+			Ipv4Address origin = header.GetSource ();
+			m_neighbors.Purge ();
 
-		if (nextHop != Ipv4Address::GetZero ())
-		{
+			uint32_t updated = 0;
+			Vector Position;
+			Vector RecPosition;
+			uint8_t inRec = 0;
+
+			TypeHeader tHeader (GPSRTYPE_POS);
+			PositionHeader hdr;
+			p->RemoveHeader (tHeader);
+
+			if (!tHeader.IsValid ())
+			{
+					NS_LOG_DEBUG ("GPSR message " << p->GetUid () << " with unknown type received: " << tHeader.Get () << " Drop");
+					NS_LOG_DEBUG ("Forwarding meet packet drop because tHeader Deserialize failed "<<tHeader.IsValid ());
+					return false; // drop
+			}
+			if (tHeader.Get () == GPSRTYPE_POS)
+			{
+					p->RemoveHeader (hdr);
+					Position.x = hdr.GetDstPosx ();
+					Position.y = hdr.GetDstPosy ();
+					updated = hdr.GetUpdated ();
+					RecPosition.x = hdr.GetRecPosx ();
+					RecPosition.y = hdr.GetRecPosy ();
+					inRec = hdr.GetInRec ();
+			}
+			Vector myPos;
+			Ptr<MobilityModel> MM = m_ipv4->GetObject<MobilityModel> ();
+			myPos.x = MM->GetPosition ().x;
+			myPos.y = MM->GetPosition ().y;
+			Vector myVec;
+			myVec=MM->GetVelocity();
+			//見つかったノードが前回の開始位置のノードよりも終点に近い場合は、リカバリーモードがジャンプします
+			if(inRec == 1 && CalculateDistance (myPos, Position) < CalculateDistance (RecPosition, Position)) {
+					inRec = 0;
+					hdr.SetInRec(0);
+					NS_LOG_LOGIC ("No longer in Recovery to " << dst << " in " << myPos);
+			}
+			//再びリカバリーモードになり、まだノードが目的地に近づいていない（上記の条件を満たしていない）場合は、フォワード送信を続けます
+			if(inRec) {
+					p->AddHeader (hdr);
+					p->AddHeader (tHeader); //フォワーディングやSendFromQueueと互換性のあるRecoveryModeになるように、ヘッダを戻す
+					RecoveryMode (dst, p, ucb, header);
+					return true;
+			}
+			//宛先ノードの位置情報を更新
+			uint32_t myUpdated = (uint32_t) m_locationService->GetEntryUpdateTime (dst).GetSeconds ();
+			if (myUpdated > updated) //ノードが宛先の位置を更新しているかどうかをチェックする
+			{
+					Position.x = m_locationService->GetPosition (dst).x;
+					Position.y = m_locationService->GetPosition (dst).y;
+					updated = myUpdated;
+			}
+
+			//shinato 特定のノードに転送する悪意ノード
+			Ipv4Address nextHop;			
+			
+				nextHop = ("192.168.1.50");
+				//nextHop = ("192.168.1.2");
+			
+				if(m_neighbors.isNeighbour (dst))
+				{
+						nextHop = dst;
+				}
+				else
+				{
+						nextHop = m_neighbors.BestNeighbor (Position, myPos);
+				}				
+			
+
+			if (nextHop != Ipv4Address::GetZero ())
+			{
 					//ポジションであれば、新たにブロークンヘッダーを作成し、それを追加する
 
-				PositionHeader posHeader (Position.x, Position.y,  updated, (uint64_t) 0, (uint64_t) 0, (uint8_t) 0, myPos.x, myPos.y);
-				p->AddHeader (posHeader);
-				p->AddHeader (tHeader);
+					PositionHeader posHeader (Position.x, Position.y,  updated, (uint64_t) 0, (uint64_t) 0, (uint8_t) 0, myPos.x, myPos.y);
+					p->AddHeader (posHeader);
+					p->AddHeader (tHeader);
 
-				//add udp headers
-				if(packet->GetSize()!=86)
-				{
-						UdpHeader udpHeader;
-						p->AddHeader(udpHeader);
-				}
+					//add udp headers
+					if(packet->GetSize()!=86)
+					{
+							UdpHeader udpHeader;
+							p->AddHeader(udpHeader);
+					}
 
-				Ptr<NetDevice> oif = m_ipv4->GetObject<NetDevice> ();
-				Ptr<Ipv4Route> route = Create<Ipv4Route> ();
-				route->SetDestination (dst);
-				route->SetSource (header.GetSource ());
-				route->SetGateway (nextHop);
+					Ptr<NetDevice> oif = m_ipv4->GetObject<NetDevice> ();
+					Ptr<Ipv4Route> route = Create<Ipv4Route> ();
+					route->SetDestination (dst);
+					route->SetSource (header.GetSource ());
+					route->SetGateway (nextHop);
 
-				// FIXME: Does not work for multiple interfaces
-				route->SetOutputDevice (m_ipv4->GetNetDevice (1));
-				route->SetDestination (header.GetDestination ());
-				NS_ASSERT (route != 0);
-				NS_LOG_DEBUG ("Exist route to " << route->GetDestination () << " from interface " << route->GetOutputDevice ());
-				NS_LOG_DEBUG (route->GetOutputDevice () << " forwarding to " << dst << " from " << origin << " through " << route->GetGateway () << " packet " << p->GetUid ());
+					// FIXME: Does not work for multiple interfaces
+					route->SetOutputDevice (m_ipv4->GetNetDevice (1));
+					route->SetDestination (header.GetDestination ());
+					NS_ASSERT (route != 0);
+					NS_LOG_DEBUG ("Exist route to " << route->GetDestination () << " from interface " << route->GetOutputDevice ());
+					NS_LOG_DEBUG (route->GetOutputDevice () << " forwarding to " << dst << " from " << origin << " through " << route->GetGateway () << " packet " << p->GetUid ());
 
-				ucb (route, p, header);
-					
-				return true;
+					ucb (route, p, header);
+					//ucb (route, p, header);
+					return true;
+
+			}
+		
+			hdr.SetInRec(1);
+			hdr.SetRecPosx (myPos.x);
+			hdr.SetRecPosy (myPos.y);
+			hdr.SetLastPosx (Position.x); //when entering Recovery, the first edge is the Dst
+			hdr.SetLastPosy (Position.y);
+
+
+			p->AddHeader (hdr);
+			p->AddHeader (tHeader);
+			RecoveryMode (dst, p, ucb, header);
+
+			NS_LOG_LOGIC ("Entering recovery-mode to " << dst << " in " << m_ipv4->GetAddress (1, 0).GetLocal ());
+			return true;
 		}
-		
-		hdr.SetInRec(1);
-		hdr.SetRecPosx (myPos.x);
-		hdr.SetRecPosy (myPos.y);
-		hdr.SetLastPosx (Position.x); //when entering Recovery, the first edge is the Dst
-		hdr.SetLastPosy (Position.y);
-
-
-		p->AddHeader (hdr);
-		p->AddHeader (tHeader);
-		RecoveryMode (dst, p, ucb, header);
-
-		NS_LOG_LOGIC ("Entering recovery-mode to " << dst << " in " << m_ipv4->GetAddress (1, 0).GetLocal ());
-		return true;
-		
 }
 
 
@@ -1192,6 +1225,5 @@ RoutingProtocol::GetDownTarget (void) const
 
 
 }
+
 }
-
-

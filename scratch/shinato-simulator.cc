@@ -375,7 +375,7 @@ private:
 
 VanetRoutingExperiment::VanetRoutingExperiment ()//コンストラクターパラメータの初期化
 : m_port (9),//ポート番号
-m_nNodes (5),//ノード数
+m_nNodes (40),//ノード数
 m_protocolName ("NGPSR"),//プロトコル名
 m_txp (17.026),//送信電力(dB)
 m_EDT (-96),
@@ -383,7 +383,7 @@ m_lossModelName ("ns3::LogDistancePropagationLossModel"),//電波伝搬損失モ
 m_rate ("8192bps"),//レート(bps)
 m_phyMode ("OfdmRate24MbpsBW10MHz"),//wifiの物理層のモード 変調方式ofdm,レート6Mbps,帯域幅10MHz
 m_packetSize("1024"),
-m_totalSimTime (60.0),// シミュレーション時間
+m_totalSimTime (250.0),// シミュレーション時間
 m_fileName("/home/hry-user/dataTemp/data.txt"),
 m_adhocTxNodes (),//アホック送信ノード
 m_pdr (0),
@@ -392,7 +392,7 @@ m_delay (0),
 m_overHead (0),
 m_packetLoss (0),
 m_numHops(0),
-m_traceFile("/home/hry-user/ns-allinone-3.26/ns-3.26/node/test.tcl")
+m_traceFile("/home/hry-user/ns-allinone-3.26/ns-3.26/node/mobility.tcl")
 {
 	//送受信ノードを選択
     m_sourceNode=0;

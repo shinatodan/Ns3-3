@@ -38,25 +38,76 @@ PositionTable::GetEntryUpdateTime (Ipv4Address id)
  */
 //TODO 仕上がり速度
 void
-PositionTable::AddEntry (Ipv4Address id, Vector position)
+PositionTable::AddEntry (Ipv4Address id, Vector position, uint32_t flag)
 {
 		std::map<Ipv4Address, Metrix >::iterator i = m_table.find (id);
-		if(i != m_table.end() || id.IsEqual (i->first))
-		{
-			m_table.erase (id);
+		//shinato
+		if(flag == 1)
+		{	
+			if (i != m_table.end () || id.IsEqual (i->first))
+			{
+				m_table.erase (id);
+				
+				Metrix metrix;
+				//position.x=765;//宛先ノード近い
+				position.y=700;
+				metrix.position=position;
+				metrix.time=Simulator::Now ();
+				m_table.insert (std::make_pair (id, metrix));
+				return; //返さないとと後の処理ができない
+			}
+			//IDがテーブルにないとき、IDを追加
+			Metrix metrix;
+			position.x=700;//宛先ノード近い
+			
+			metrix.position=position;
+			metrix.time=Simulator::Now ();
+			m_table.insert (std::make_pair (id, metrix));
+			return;
+		}
+		else if(flag == 2)
+		{	
+			if (i != m_table.end () || id.IsEqual (i->first))
+			{
+				m_table.erase (id);
+				
+				Metrix metrix;
+				position.x=1790;//宛先ノード近い
+				position.y=790;
+				metrix.position=position;
+				metrix.time=Simulator::Now ();
+				m_table.insert (std::make_pair (id, metrix));
+				return; //返さないとと後の処理ができない
+			}
+			//IDがテーブルにないとき、IDを追加
+			Metrix metrix;
+			position.x=1790;//宛先ノード近い
+			position.y=790;
+			metrix.position=position;
+			metrix.time=Simulator::Now ();
+			m_table.insert (std::make_pair (id, metrix));
+			return;
+		}
+		else{
+			//テーブルのID、テーブルの更新、位置と速度の情報の追加
+			if (i != m_table.end () || id.IsEqual (i->first))
+			{
+				m_table.erase (id);
+				Metrix metrix;
+				metrix.position=position;
+				metrix.time=Simulator::Now ();
+				m_table.insert (std::make_pair (id, metrix));
+				return; //返さないとと後の処理ができない
+			}
+
+			//IDがテーブルにないとき、IDを追加
 			Metrix metrix;
 			metrix.position=position;
 			metrix.time=Simulator::Now ();
 			m_table.insert (std::make_pair (id, metrix));
 			return;
 		}
-		Metrix metrix;
-		metrix.position=position;
-		metrix.time=Simulator::Now ();
-		m_table.insert (std::make_pair (id, metrix));
 }
-		
-		
 /**
  * \brief Deletes entry in position table
  */

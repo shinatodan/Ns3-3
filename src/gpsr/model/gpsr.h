@@ -120,7 +120,7 @@ private:
   
   //shinato
   uint32_t nodeId = 0;
-  std::string Addpass(std::string &s, uint32_t Id);
+  
   
   uint32_t MaxQueueLen;                  ///<ルーティング プロトコルがバッファできるパケットの最大数
   Time MaxQueueTime;                     ///<ルーティング プロトコルがパケットをバッファできる最大時間
