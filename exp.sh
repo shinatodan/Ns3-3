@@ -1,25 +1,25 @@
 rm -rf ~/dataTemp
-rm -rf ~/shinato1/* #dataファイルの下を削除する
-##mkdir ~/"shinato2/GPSR"
-##mkdir ~/"shinato2/LGPSR"
+rm -rf ~/Simulation/* #dataファイルの下を削除する
+mkdir ~/"Simulation/GPSR"
+mkdir ~/"Simulation/NGPSR"
+
 
 start_time=`date +%s` 
 
 i=1 #loop
-r=10 #実験回数
+r=2 #実験回数
 
-for protocol in GPSR 
+for protocol in GPSR NGPSR
 do
 
-	mkdir ~/"dataTemp"
-	mkdir ~/"shinato1/$protocol"
+	mkdir -p ~/"dataTemp"
 	while [ $i -le $r ]; do
 	
 	echo "-run $i  --RoutingProtocol=$protocol "
-	./waf --run "shinato --protocolName=$protocol --nodeNum=60 -simTime=430 "
+	./waf --run "shinato-simulator --protocolName=$protocol "
 	
 	mv ~/dataTemp/data.txt ~/dataTemp/data$i.txt
-	mv ~/dataTemp/data$i.txt ~/shinato1/$protocol
+	mv ~/dataTemp/data$i.txt ~/Simulation/$protocol
 	i=`expr $i + 1`
 	
 	done
@@ -40,5 +40,3 @@ end_time=`date +%s` #unix時刻から現在の時刻までの秒数を取得
   SS=`expr ${SS} % 60` #秒を計算
 
   echo "シュミレーション時間${HH}:${MM}:${SS}" #シミュレーションにかかった時間を　時:分:秒で表示する
-
-

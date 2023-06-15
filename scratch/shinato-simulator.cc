@@ -328,6 +328,7 @@ public:
     void ConfigureDefaults ();//デフォルトの属性を設定する
     void RunFlowMonitor();
     static void CourseChange (std::ostream *os, std::string foo, Ptr<const MobilityModel> mobility);//トレースファイル読み込み
+    virtual void ProcessOutputs ();//出力を処理する
 
 private:
 
@@ -344,6 +345,7 @@ private:
     std::string m_phyMode;//wifiの物理層のモード
     std::string m_packetSize;
     double m_totalSimTime;//シミュレーション時間の合計
+    std::string m_fileName;
 
     NetDeviceContainer m_adhocTxDevices;//アドホック送信デバイス
     Ipv4InterfaceContainer m_adhocTxInterfaces;//アドホック送信インターフェイス
@@ -375,13 +377,14 @@ VanetRoutingExperiment::VanetRoutingExperiment ()//コンストラクターパ�
 : m_port (9),//ポート番号
 m_nNodes (5),//ノード数
 m_protocolName ("NGPSR"),//プロトコル名
-m_txp (16.026),//送信電力(dB)
+m_txp (17.026),//送信電力(dB)
 m_EDT (-96),
 m_lossModelName ("ns3::LogDistancePropagationLossModel"),//電波伝搬損失モデルの名前
 m_rate ("8192bps"),//レート(bps)
 m_phyMode ("OfdmRate24MbpsBW10MHz"),//wifiの物理層のモード 変調方式ofdm,レート6Mbps,帯域幅10MHz
 m_packetSize("1024"),
-m_totalSimTime (360.0),// シミュレーション時間
+m_totalSimTime (60.0),// シミュレーション時間
+m_fileName("/home/hry-user/dataTemp/data.txt"),
 m_adhocTxNodes (),//アホック送信ノード
 m_pdr (0),
 m_throughput (0),
@@ -408,6 +411,7 @@ VanetRoutingExperiment::Simulate (int argc, char **argv)//シミュレーショ�
     ConfigureMobility ();//モビリティーを設定する
     ConfigureApplications ();//アプリケーションを設定する
     RunSimulation ();//シミュレーションを実行する
+    ProcessOutputs ();
 }
 
 void
@@ -613,6 +617,20 @@ VanetRoutingExperiment::RunFlowMonitor()
     std::cout<<"受信パケット数合計"<<sumRxPackets<<std::endl;
     std::cout<<"送信オーバーヘッド合計"<<sumOverHead<<std::endl;
     
+}
+
+void
+VanetRoutingExperiment::ProcessOutputs ()
+{//出力を処理する
+    std::ofstream out (m_fileName.c_str(),std::ios::out|std::ios::app);
+    out<<m_throughput<<std::endl;
+    out<<m_pdr<<std::endl;
+    out<<m_overHead<<std::endl;
+    out<<m_delay<<std::endl;
+    out<<m_packetLoss<<std::endl;
+    out<<m_numHops<<std::endl;
+
+    out.close();
 }
 
 

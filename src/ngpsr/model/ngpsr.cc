@@ -752,18 +752,18 @@ RoutingProtocol::RecvNGPSR (Ptr<Socket> socket)
         // DSA署名検証
         if (DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), GetDsaParameterIP()) != 1)//検証成功で１を返す。
         {
-                std::cerr << "DSA IPsignature verification failed" << std::endl;
+                //std::cerr << "DSA IPsignature verification failed" << std::endl;
         }
         else if(DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), GetDsaParameterIP()) == 1)
         {
-                std::cout << "DSA IPsignature verification succeeded" << std::endl;
+                //std::cout << "DSA IPsignature verification succeeded" << std::endl;
                 if (DSA_verify(0, digest2, SHA256_DIGEST_LENGTH, hdr.GetPosSignature(), hdr.GetPosSignatureLength(), GetDsaParameterPOS()) != 1)//検証成功で１を返す。
                 {
-                        std::cerr << "DSA possignature verification failed" << std::endl;
+                        //std::cerr << "DSA possignature verification failed" << std::endl;
                 }
                 else if(DSA_verify(0, digest2, SHA256_DIGEST_LENGTH, hdr.GetPosSignature(), hdr.GetPosSignatureLength(), GetDsaParameterPOS()) == 1)
                 {
-                        std::cout << "DSA possignature verification succeeded" << std::endl;
+                        //std::cout << "DSA possignature verification succeeded" << std::endl;
                         UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
                 }
         }

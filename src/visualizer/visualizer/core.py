@@ -767,14 +767,8 @@ class Visualizer(gobject.GObject):
 				
 				
 				#shinato
-                if nodeI == 53 or nodeI == 44 or nodeI == 45 or nodeI == 24 or nodeI == 8 or nodeI == 6 or nodeI == 47 or nodeI == 54 or nodeI == 52 or nodeI == 57:
-                   node_view.set_color("red")
-                elif nodeI == 1 or nodeI == 17 or nodeI == 40 or nodeI == 20 or nodeI == 58 or nodeI == 47 or nodeI == 31 or nodeI == 35 or nodeI == 22 or nodeI ==3:
-                   node_view.set_color("red")
-                elif nodeI == 59 or nodeI == 10 or nodeI == 9 or nodeI == 7 or nodeI == 18 or nodeI == 14 or nodeI == 15 or nodeI == 12 or nodeI == 43 or nodeI == 11:
-                   node_view.set_color("red")
-#                if nodeI == 4:
-#                   node_view.set_color("black")
+                if nodeI == 3 or nodeI == 0:
+                   node_view.set_color("black")
                 else:
 				   node_view.set_color("red")
                 pos = mobility.GetPosition()
