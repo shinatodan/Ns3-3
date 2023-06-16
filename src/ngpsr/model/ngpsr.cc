@@ -739,31 +739,21 @@ RoutingProtocol::RecvNGPSR (Ptr<Socket> socket)
         unsigned char digest2[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
         SHA256(reinterpret_cast<const unsigned char*>(tracefile.c_str()), tracefile.length(), digest2);//与えられたデータ（メッセージ）のハッシュ値を計算
 
-        //std::string signatureText = ConvertToHex(hdr.GetSignature(), hdr.GetSignatureLength());
-        //std::cout << "送信後署名: " << signatureText << std::endl;
-        //std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
-        //std::cout << "送信後ハッシュ値: " << hashText << std::endl;
-        //std::cout << "送信後署名長さ：" << hdr.GetSignatureLength() << std::endl;
-        //std::cout << "送信後ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
-        //std::cout << "送信後鍵：" << GetDsaParameterIP() << std::endl;
-
-
-
         // DSA署名検証
         if (DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), GetDsaParameterIP()) != 1)//検証成功で１を返す。
         {
-                //std::cerr << "DSA IPsignature verification failed" << std::endl;
+                std::cerr << "DSA IPsignature verification failed" << std::endl;
         }
         else if(DSA_verify(0, digest, SHA256_DIGEST_LENGTH, hdr.GetSignature(), hdr.GetSignatureLength(), GetDsaParameterIP()) == 1)
         {
-                //std::cout << "DSA IPsignature verification succeeded" << std::endl;
+                std::cout << "DSA IPsignature verification succeeded" << std::endl;
                 if (DSA_verify(0, digest2, SHA256_DIGEST_LENGTH, hdr.GetPosSignature(), hdr.GetPosSignatureLength(), GetDsaParameterPOS()) != 1)//検証成功で１を返す。
                 {
-                        //std::cerr << "DSA possignature verification failed" << std::endl;
+                        std::cerr << "DSA possignature verification failed" << std::endl;
                 }
                 else if(DSA_verify(0, digest2, SHA256_DIGEST_LENGTH, hdr.GetPosSignature(), hdr.GetPosSignatureLength(), GetDsaParameterPOS()) == 1)
                 {
-                        //std::cout << "DSA possignature verification succeeded" << std::endl;
+                        std::cout << "DSA possignature verification succeeded" << std::endl;
                         UpdateRouteToNeighbor (sender, receiver, Position, nodeId);//近隣ノードの情報更新
                 }
         }
@@ -957,39 +947,40 @@ RoutingProtocol::SendHello ()
         //helloパケットに追加する数字
         uint64_t nodeId = m_ipv4->GetObject<Node> ()->GetId ();//ノードID取得
         std::string nodeid = std::to_string(nodeId);//ノードIDを文字列に変換
-        /*//IDのハッシュ値計算
-        unsigned char digest[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
-        SHA256(reinterpret_cast<const unsigned char*>(nodeid.c_str()), nodeid.length(), digest);//与えられたデータ（メッセージ）のハッシュ値を計算
-        
-        //DSA署名生成
-        unsigned char signature[DSA_size(GetDsaParameterIP())];
-        unsigned int signatureLength;
-        if (DSA_sign(0, digest, SHA256_DIGEST_LENGTH, signature, &signatureLength, GetDsaParameterIP()) != 1)
+
+        std::string IPliar = "not NGPSR";
+        //IDのハッシュ値計算
+        unsigned char digest_IPliar[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
+        SHA256(reinterpret_cast<const unsigned char*>(IPliar.c_str()), IPliar.length(), digest_IPliar);//与えられたデータ（メッセージ）のハッシュ値を計算
+        //IP詐称ノードの署名生成
+        unsigned char signature_IPliar[DSA_size(GetDsaParameterIP())];
+        unsigned int signatureLength_IPliar;
+        if (DSA_sign(0, digest_IPliar, SHA256_DIGEST_LENGTH, signature_IPliar, &signatureLength_IPliar, GetDsaParameterIP()) != 1)
         {
                 std::cerr << "Failed to generate DSA signature" << std::endl;
                 handleErrors();
-        }*/
+        }
 
-        // 署名と長さを取得する
-        //unsigned char* signature = GetDsaSignatureIP();
-        //unsigned int signatureLength = GetDsaSignatureLengthIP();
-        // 署名と長さを取得する
+        std::string POSliar = "wrong pos";
+        //IDのハッシュ値計算
+        unsigned char digest_POSliar[SHA256_DIGEST_LENGTH];//SHA256_DIGEST_LENGTHはSHA-256ハッシュのバイト長を表す定数
+        SHA256(reinterpret_cast<const unsigned char*>(POSliar.c_str()), POSliar.length(), digest_POSliar);//与えられたデータ（メッセージ）のハッシュ値を計算
+        //IP詐称ノードの署名生成
+        unsigned char signature_POSliar[DSA_size(GetDsaParameterIP())];
+        unsigned int signatureLength_POSliar;
+        if (DSA_sign(0, digest_POSliar, SHA256_DIGEST_LENGTH, signature_POSliar, &signatureLength_POSliar, GetDsaParameterIP()) != 1)
+        {
+                std::cerr << "Failed to generate DSA signature" << std::endl;
+                handleErrors();
+        }
 
+      
+        // 署名と長さを取得する
         const unsigned char* signature = GetDsaSignatureIP();
         unsigned int signatureLength = GetDsaSignatureLengthIP();
 
         const unsigned char* possignature = GetDsaSignaturePOS();
         unsigned int possignatureLength = GetDsaSignatureLengthPOS();
-
-
-        //std::string signatureText = ConvertToHex(signature, signatureLength);
-        //std::cout << "送信前署名: " << signatureText << std::endl;
-        //std::string hashText = ConvertToHex(digest, SHA256_DIGEST_LENGTH);
-        //std::cout << "送信前ハッシュ値: " << hashText << std::endl;
-        //std::cout << "送信前署名長さ：" << signatureLength << std::endl;
-        //std::cout << "送信前ハッシュ値長さ：" << SHA256_DIGEST_LENGTH << std::endl;
-        //std::cout << "送信前鍵：" << GetDsaParameterIP() << std::endl;
-
 
 
 	for (std::map<Ptr<Socket>, Ipv4InterfaceAddress>::const_iterator j = m_socketAddresses.begin (); j != m_socketAddresses.end (); ++j)
@@ -999,27 +990,68 @@ RoutingProtocol::SendHello ()
 
                 //shinato
                 //helloヘッダーにDSA署名を追加
-		HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY), nodeId, signature, signatureLength, possignature, possignatureLength);
-                
 
-		Ptr<Packet> packet = Create<Packet> ();
-		packet->AddHeader (helloHeader);
-		TypeHeader tHeader (NGPSRTYPE_HELLO);
-		packet->AddHeader (tHeader);
-		//32アドレスの場合は全ホストのブロードキャストに送信、そうでない場合はサブネット経由で送信
-		Ipv4Address destination;
-		if (iface.GetMask () == Ipv4Mask::GetOnes ())
-		{
-			destination = Ipv4Address ("255.255.255.255");
-			NS_LOG_DEBUG("Send hello to destination"<<destination );
-		}
-		else
-		{
-			destination = iface.GetBroadcast ();
-			NS_LOG_DEBUG("Send hello to destination"<<destination );
-		}
-		socket->SendTo (packet, 0, InetSocketAddress (destination, NGPSR_PORT));
-	}
+                if(nodeId == 20 || nodeId == 25){
+                        HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY), nodeId, signature_IPliar, signatureLength_IPliar, possignature, possignatureLength);
+                        Ptr<Packet> packet = Create<Packet> ();
+		        packet->AddHeader (helloHeader);
+                        TypeHeader tHeader (NGPSRTYPE_HELLO);
+                        packet->AddHeader (tHeader);
+                        //32アドレスの場合は全ホストのブロードキャストに送信、そうでない場合はサブネット経由で送信
+                        Ipv4Address destination;
+                        if (iface.GetMask () == Ipv4Mask::GetOnes ())
+                        {
+                                destination = Ipv4Address ("255.255.255.255");
+                                NS_LOG_DEBUG("Send hello to destination"<<destination );
+                        }
+                        else
+                        {
+                                destination = iface.GetBroadcast ();
+                                NS_LOG_DEBUG("Send hello to destination"<<destination );
+                        }
+                        socket->SendTo (packet, 0, InetSocketAddress (destination, NGPSR_PORT));
+                }
+                else if(nodeId == 23 || nodeId == 28){
+                        HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY), nodeId, signature, signatureLength, signature_POSliar, signatureLength_POSliar);
+                        Ptr<Packet> packet = Create<Packet> ();
+		        packet->AddHeader (helloHeader);
+                        TypeHeader tHeader (NGPSRTYPE_HELLO);
+                        packet->AddHeader (tHeader);
+                        //32アドレスの場合は全ホストのブロードキャストに送信、そうでない場合はサブネット経由で送信
+                        Ipv4Address destination;
+                        if (iface.GetMask () == Ipv4Mask::GetOnes ())
+                        {
+                                destination = Ipv4Address ("255.255.255.255");
+                                NS_LOG_DEBUG("Send hello to destination"<<destination );
+                        }
+                        else
+                        {
+                                destination = iface.GetBroadcast ();
+                                NS_LOG_DEBUG("Send hello to destination"<<destination );
+                        }
+                        socket->SendTo (packet, 0, InetSocketAddress (destination, NGPSR_PORT));
+                }
+                else{
+                        HelloHeader helloHeader (((uint64_t) positionX),((uint64_t) positionY), nodeId, signature, signatureLength, possignature, possignatureLength);
+                        Ptr<Packet> packet = Create<Packet> ();
+		        packet->AddHeader (helloHeader);
+                        TypeHeader tHeader (NGPSRTYPE_HELLO);
+                        packet->AddHeader (tHeader);
+                        //32アドレスの場合は全ホストのブロードキャストに送信、そうでない場合はサブネット経由で送信
+                        Ipv4Address destination;
+                        if (iface.GetMask () == Ipv4Mask::GetOnes ())
+                        {
+                                destination = Ipv4Address ("255.255.255.255");
+                                NS_LOG_DEBUG("Send hello to destination"<<destination );
+                        }
+                        else
+                        {
+                                destination = iface.GetBroadcast ();
+                                NS_LOG_DEBUG("Send hello to destination"<<destination );
+                        }
+                        socket->SendTo (packet, 0, InetSocketAddress (destination, NGPSR_PORT));
+	        }
+        }
 		
 }
 
@@ -1159,6 +1191,15 @@ bool
 RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header,
                              UnicastForwardCallback ucb, ErrorCallback ecb)
 {
+                //shinato 転送しない悪意ノード
+	int not_foward = m_ipv4->GetObject<Node> ()->GetId ();
+        if(not_foward == 20||not_foward ==25)
+	{	
+		return true;
+	}
+	else
+	{        
+
 		Ptr<Packet> p = packet->Copy ();
 		NS_LOG_FUNCTION (this);
 		Ipv4Address dst = header.GetDestination ();
@@ -1275,6 +1316,7 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
 
 		NS_LOG_LOGIC ("Entering recovery-mode to " << dst << " in " << m_ipv4->GetAddress (1, 0).GetLocal ());
 		return true;
+        }
 		
 }
 

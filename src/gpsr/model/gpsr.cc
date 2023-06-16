@@ -717,11 +717,11 @@ RoutingProtocol::UpdateRouteToNeighbor (Ipv4Address sender, Ipv4Address receiver
 	
 		if(sender==("192.168.1.24"))//位置情報を変えるノード(192.168.1.nodeId+1)
 		{
-			flag = 0;
+			flag = 1;
 		}
 		else if(sender==("192.168.1.29"))
 		{
-			flag = 0;
+			flag = 2;
 		}
 		
 		else{
@@ -1076,8 +1076,7 @@ RoutingProtocol::Forwarding (Ptr<const Packet> packet, const Ipv4Header & header
 
 		
 		//if(not_foward == 59 ||not_foward == 10 ||not_foward == 9 ||not_foward == 7 ||not_foward == 18 ||not_foward == 14 ||not_foward == 15 ||not_foward == 12 ||not_foward == 43 ||not_foward == 11)
-		//if(not_foward == 20||not_foward ==25)
-                if(not_foward == 20000||not_foward ==250000)
+                if(not_foward == 20||not_foward ==25)
 		{	
 			return true;
 		}
