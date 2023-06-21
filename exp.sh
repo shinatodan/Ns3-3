@@ -11,7 +11,7 @@ mkdir ~/"Simulation/NGPSR"
 start_time=`date +%s` 
 
 i=1 #loop
-r=1 #実験回数
+r=1000 #実験回数
 
 for protocol in GPSR NGPSR
 do
