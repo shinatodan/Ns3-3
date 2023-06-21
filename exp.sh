@@ -1,3 +1,7 @@
+LINE_NOTIFY_API="https://notify-api.line.me/api/notify"
+TOKEN="Ouu8Lp3Aq9gDEdJjMY0XaTxtBSDRo0sfB5s76BEfVey"
+
+
 rm -rf ~/dataTemp
 rm -rf ~/Simulation/* #dataファイルの下を削除する
 mkdir ~/"Simulation/GPSR"
@@ -7,7 +11,7 @@ mkdir ~/"Simulation/NGPSR"
 start_time=`date +%s` 
 
 i=1 #loop
-r=30 #実験回数
+r=1 #実験回数
 
 for protocol in GPSR NGPSR
 do
@@ -40,3 +44,11 @@ end_time=`date +%s` #unix時刻から現在の時刻までの秒数を取得
   SS=`expr ${SS} % 60` #秒を計算
 
   echo "シュミレーション時間${HH}:${MM}:${SS}" #シミュレーションにかかった時間を　時:分:秒で表示する
+
+  send_line_notification() {
+    message="シミュレーションが終了しました。"
+    curl -X POST -H "Authorization: Bearer $TOKEN" -F "message=$message" $LINE_NOTIFY_API
+}
+
+# LINE通知を送信
+send_line_notification

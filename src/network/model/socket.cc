@@ -136,8 +136,8 @@ Socket::Send (Ptr<Packet> p)//データ配送部分
 {
   NS_LOG_FUNCTION (this << p);
   //shinato
-  std::cout << cnt << std::endl;
-  cnt++;
+  //std::cout << cnt << std::endl;
+  //cnt++;
   return Send (p, 0);//udpsocketimpl::send() を呼び出している？？
 }
 

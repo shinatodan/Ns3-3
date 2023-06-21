@@ -367,6 +367,7 @@ private:
     double m_throughput;
     double m_delay;
     double m_overHead;
+    uint32_t overhead;
     double m_packetLoss;
     double m_numHops;
     std::string m_traceFile;
@@ -390,6 +391,7 @@ m_pdr (0),
 m_throughput (0),
 m_delay (0),
 m_overHead (0),
+overhead (0),
 m_packetLoss (0),
 m_numHops(0),
 m_traceFile("/home/hry-user/ns-allinone-3.26/ns-3.26/node/mobility.tcl")
@@ -590,6 +592,7 @@ VanetRoutingExperiment::RunFlowMonitor()
     m_overHead = ((double(m_wifiPhyStats->GetPhyTxBytes()-sumTxBytes))/m_wifiPhyStats->GetPhyTxBytes())*100;
     if(m_overHead<0.0)
       m_overHead=0.0;
+    overhead = m_wifiPhyStats->GetPhyTxBytes()-sumTxBytes;
     m_delay = ((sumDelay.GetSeconds()/sumRxPackets))*1000;
     if(std::isnan(m_delay))
       m_delay=0.0;
@@ -601,6 +604,7 @@ VanetRoutingExperiment::RunFlowMonitor()
     std::cout<<"スループット(kbps)"<<m_throughput<<std::endl;
     std::cout<<"配送率"<<m_pdr<<std::endl;
     std::cout<<"オーバーヘッド割合"<<m_overHead<<std::endl;
+    std::cout<<"オーバーヘッド"<<overhead<<std::endl;
     std::cout<<"平均遅延(ms)"<<m_delay<<std::endl;
     std::cout<<"パケットロス率"<<m_packetLoss<<std::endl;
     std::cout<<"平均ホップ数"<<m_numHops<<std::endl;
@@ -625,7 +629,8 @@ VanetRoutingExperiment::ProcessOutputs ()
     std::ofstream out (m_fileName.c_str(),std::ios::out|std::ios::app);
     out<<m_throughput<<std::endl;
     out<<m_pdr<<std::endl;
-    out<<m_overHead<<std::endl;
+    //out<<m_overHead<<std::endl;
+    out<<overhead<<std::endl;
     out<<m_delay<<std::endl;
     out<<m_packetLoss<<std::endl;
     out<<m_numHops<<std::endl;
